@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "WiFi Auto-Login",
+  "version": "1.0",
+  "description": "A SJS Product to Simply Auto-Continue to WiFi",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "48": "icons/icon-48.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"]
+    }
+  ]
+}
