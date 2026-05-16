@@ -1,7 +1,26 @@
 if (window.location.href.startsWith("https://172.16.0.2:1003")) {
   console.log("WiFi Auto-Login script activated.");
 
-  // Function to create "Auto-Fill" button
+  function findUsernameField() {
+    return document.querySelector(
+      'input[name="username"], input[name="user"], input[name="auth_user"], input[placeholder*="Username"], input[type="text"], input[type="email"]'
+    );
+  }
+
+  function findPasswordField() {
+    return document.querySelector(
+      'input[name="password"], input[name="pass"], input[placeholder*="Password"], input[type="password"]'
+    );
+  }
+
+  function findLoginButton() {
+    const buttons = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+    return buttons.find((el) => {
+      const text = (el.innerText || el.value || "").toLowerCase();
+      return /sign in|sign-in|login|continue|submit|connect/.test(text);
+    }) || document.querySelector('button[type="submit"], input[type="submit"]');
+  }
+
   function createAutoFillButton() {
       let button = document.createElement("button");
       button.innerText = "Auto-Continue";
@@ -18,20 +37,18 @@ if (window.location.href.startsWith("https://172.16.0.2:1003")) {
 
       document.body.appendChild(button);
 
-      // Event listener for Auto-Fill button
       button.addEventListener("click", function () {
           chrome.storage.local.get(["username", "password"], function (data) {
               if (data.username && data.password) {
-                  let usernameField = document.querySelector('input[name="username"]');
-                  let passwordField = document.querySelector('input[name="password"]');
-                  let loginButton = document.querySelector('button[type="submit"]');
+                  let usernameField = findUsernameField();
+                  let passwordField = findPasswordField();
+                  let loginButton = findLoginButton();
 
                   if (usernameField && passwordField) {
                       usernameField.value = data.username;
                       passwordField.value = data.password;
                       console.log("Credentials autofilled.");
 
-                      // Click the "Continue" button automatically
                       if (loginButton) {
                           loginButton.click();
                           console.log("Login button clicked.");
@@ -39,15 +56,14 @@ if (window.location.href.startsWith("https://172.16.0.2:1003")) {
                           console.log("Login button not found.");
                       }
                   } else {
-                      console.log("Username or Password field not found.");
+                      alert("Could not find the login fields on this page. Please check the page layout.");
                   }
               } else {
-                  alert("No credentials saved. Please enter them in the extension popup.");
+                  alert("No credentials saved. Please enter them once in the extension popup.");
               }
           });
       });
   }
 
-  // Run the function to create button
   createAutoFillButton();
 }

@@ -3,11 +3,20 @@
 <head>
     <title>WiFi Auto Login</title>
     <script src="popup.js" defer></script>
+    <style>
+        body { font-family: Arial, sans-serif; width: 280px; padding: 18px; margin: 0; }
+        h2 { margin: 0 0 12px; font-size: 1.2rem; }
+        input, button { width: 100%; margin: 8px 0; padding: 10px; box-sizing: border-box; }
+        button { background: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1664c1; }
+        #status { font-size: 0.95rem; margin-top: 8px; color: #333; }
+    </style>
 </head>
 <body>
-    <h2>Enter WiFi Credentials</h2>
+    <h2>WiFi Auto Login</h2>
+    <p id="status">Loading saved credentials...</p>
     <input type="text" id="username" placeholder="Username">
     <input type="password" id="password" placeholder="Password">
-    <button id="save">Save</button>
+    <button id="save">Save credentials</button>
 </body>
 </html>
