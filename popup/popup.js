@@ -20,6 +20,8 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
+    const clearButton = document.getElementById("clear");
+
     saveButton.addEventListener("click", function () {
         let username = usernameInput.value.trim();
         let password = passwordInput.value.trim();
@@ -32,6 +34,15 @@ document.addEventListener("DOMContentLoaded", function () {
         chrome.storage.local.set({ username, password }, function () {
             showStatus("Credentials saved successfully.");
             saveButton.textContent = "Update saved credentials";
+        });
+    });
+
+    clearButton.addEventListener("click", function () {
+        chrome.storage.local.remove(["username", "password"], function () {
+            usernameInput.value = "";
+            passwordInput.value = "";
+            saveButton.textContent = "Save credentials";
+            showStatus("Saved credentials cleared.");
         });
     });
 });
