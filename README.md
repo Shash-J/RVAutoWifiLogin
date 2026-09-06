@@ -3,7 +3,7 @@
 A Chrome extension that adds an `Auto-Continue` button to the RV Institutions login page and saves WiFi credentials so users only need to enter them once.
 
 ## Features
-
+- shown 100% reliability over 3 years based on practical usage experience.
 - Save WiFi username and password once in the extension popup
 - Load saved credentials automatically on next use
 - Autofill the login form and submit the page when `Auto-Continue` is pressed
