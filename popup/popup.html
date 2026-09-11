@@ -1,23 +1,127 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>WiFi Auto Login</title>
+    <meta charset="UTF-8">
+    <title>RVCE WiFi Auto-Login</title>
     <script src="popup.js" defer></script>
     <style>
-        body { font-family: Arial, sans-serif; width: 280px; padding: 18px; margin: 0; }
-        h2 { margin: 0 0 12px; font-size: 1.2rem; }
-        input, button { width: 100%; margin: 8px 0; padding: 10px; box-sizing: border-box; }
-        button { background: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #1664c1; }
-        #status { font-size: 0.95rem; margin-top: 8px; color: #333; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            width: 300px;
+            padding: 16px;
+            margin: 0;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        h2 {
+            margin: 0 0 6px;
+            font-size: 1.15rem;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .subtitle {
+            font-size: 0.78rem;
+            color: #64748b;
+            margin-bottom: 12px;
+        }
+        .form-group {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 4px;
+        }
+        input {
+            width: 100%;
+            padding: 8px 10px;
+            box-sizing: border-box;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: #ffffff;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+        }
+        .btn-primary {
+            width: 100%;
+            padding: 9px;
+            background: #16a34a;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            margin-top: 6px;
+            transition: background 0.2s;
+        }
+        .btn-primary:hover {
+            background: #15803d;
+        }
+        .btn-secondary {
+            width: 100%;
+            padding: 8px;
+            background: transparent;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover {
+            background: #fee2e2;
+        }
+        #status {
+            font-size: 0.82rem;
+            padding: 6px 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            background: #e0f2fe;
+            color: #0369a1;
+            line-height: 1.3;
+        }
+        .footer {
+            margin-top: 12px;
+            font-size: 0.72rem;
+            color: #94a3b8;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <h2>WiFi Auto Login</h2>
-    <p id="status">Loading saved credentials...</p>
-    <input type="text" id="username" placeholder="Username">
-    <input type="password" id="password" placeholder="Password">
-    <button id="save">Save credentials</button>
-    <button id="clear">Clear saved credentials</button>
+    <h2>📶 RVCE WiFi Auto-Login</h2>
+    <div class="subtitle">Autonomous Keepalive & Auto-Connect Engine</div>
+    <div id="status">Loading configuration...</div>
+    
+    <div class="form-group">
+        <label for="username">Username / Roll No</label>
+        <input type="text" id="username" placeholder="e.g. 1rv23cs001">
+    </div>
+
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="WiFi Password">
+    </div>
+
+    <div class="form-group">
+        <label for="refreshInterval">Keepalive Refresh Interval (minutes)</label>
+        <input type="number" id="refreshInterval" min="1" max="30" value="5">
+    </div>
+
+    <button id="save" class="btn-primary">Save Settings</button>
+    <button id="clear" class="btn-secondary">Clear Saved Credentials</button>
+    
+    <div class="footer">Credentials are stored encrypted locally in Chrome.</div>
 </body>
 </html>
