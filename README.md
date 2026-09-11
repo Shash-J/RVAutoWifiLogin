@@ -18,45 +18,11 @@ At RVCE, campus Wi-Fi sessions expire periodically (typically every ~37 minutes 
 
 ## 🔄 State Machine Architecture
 
-The extension operates on a 4-state finite state machine (FSM):
+The extension operates on an autonomous 4-state finite state machine (FSM):
 
-```mermaid
-stateDiagram-v2
-    [*] --> ColdStart : Laptop opened / Connect to WiFi
-
-    state "State 1: Cold Start (Manual Prompt)" as ColdStart {
-        [*] --> IdleLoginPage : Load 172.16.0.2:1003/login
-        IdleLoginPage --> SubmittingManual : User clicks "Auto-Continue"
-        SubmittingManual : 1. Set sessionArmed = true
-        SubmittingManual : 2. Fill credentials & dispatch input events
-        SubmittingManual : 3. Click "Sign In"
-    }
-
-    state "State 2: Session Active (Keepalive Loop)" as KeepaliveLoop {
-        SubmittingManual --> KeepaliveMonitor : Auth Success (Redirect to /keepalive)
-        KeepaliveMonitor : 1. Display status badge "Auto-Refresh in Xs"
-        KeepaliveMonitor : 2. Run 5-minute countdown (configurable)
-        KeepaliveMonitor --> PageReload : Timer expires
-        PageReload --> KeepaliveMonitor : Page reloads & Fortinet timer resets
-    }
-
-    state "State 3: Auto-Reconnect (Zero-Click Recovery)" as AutoReconnect {
-        PageReload --> AutoLoginPage : Reload lands on /login (Session Expired)
-        AutoLoginPage : Detected sessionArmed == true
-        AutoLoginPage --> AutoSubmitting : Auto-trigger "Auto-Continue" (600ms delay)
-        AutoSubmitting : Autofill credentials & trigger Sign In
-        AutoSubmitting --> KeepaliveMonitor : Login Success
-    }
-
-    state "State 4: Logout Recovery" as LogoutRecovery {
-        KeepaliveMonitor --> LoggedOutPage : Session dropped / Logout page
-        LoggedOutPage : Detects "successfully log out"
-        LoggedOutPage --> AutoLoginPage : Cancel hung requests (window.stop) & watchdog retry
-    }
-
-    KeepaliveMonitor --> UserDisarmed : Auth failure or "Clear Credentials"
-    UserDisarmed --> ColdStart : sessionArmed set to false
-```
+<p align="center">
+  <img src="assets/state_machine_diagram.jpg" alt="RVCE WiFi Auto-Login State Machine Architecture" width="100%" />
+</p>
 
 ### Detailed State Breakdown
 
@@ -121,15 +87,17 @@ stateDiagram-v2
 
 ```
 RVAutoWifiLogin/
+├── assets/
+│   └── state_machine_diagram.jpg # State machine architecture diagram
 ├── icons/
-│   └── icon-48.png       # Extension toolbar icon
+│   └── icon-48.png               # Extension toolbar icon
 ├── popup/
-│   ├── popup.html        # Settings modal interface
-│   └── popup.js          # Credential & interval configuration logic
-├── background.js         # Service worker initializing default settings
-├── content-script.js     # State machine controller & UI injection
-├── manifest.json         # Manifest V3 extension configuration
-└── README.md             # Project documentation
+│   ├── popup.html                # Settings modal interface
+│   └── popup.js                  # Credential & interval configuration logic
+├── background.js                 # Service worker initializing default settings
+├── content-script.js             # State machine controller & UI injection
+├── manifest.json                 # Manifest V3 extension configuration
+└── README.md                     # Project documentation
 ```
 
 ---
