@@ -1,6 +1,8 @@
 # Build distribution
 dist/
 *.zip
+*.crx
+*.pem
 
 # OS artifacts
 .DS_Store
