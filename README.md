@@ -62,23 +62,22 @@ stateDiagram-v2
 
 | State | Trigger & Conditions | Actions & Behavior | Next Transition |
 | :--- | :--- | :--- | :--- |
-| **1. Cold Start Login** | First visit to `/login` after opening laptop (`sessionArmed = false`). | Injects the top green banner: **`Auto-Continue`**. Waits for user click. | On click $\rightarrow$ Arms session, fills credentials, clicks Sign In $\rightarrow$ **State 2**. |
+| **1. Cold Start Login** | First visit to login portal after opening laptop (`sessionArmed = false`). | Injects the top green banner: **`Auto-Continue`**. Waits for user click. | On click $\rightarrow$ Arms session, fills credentials, clicks Sign In $\rightarrow$ **State 2**. |
 | **2. Session Active** | Browser lands on `/keepalive` with active session. | Injects a floating status pill (`🛡️ RVCE Keepalive Active • Refresh in 4:59`). Runs countdown. | When timer expires $\rightarrow$ reloads page to reset Fortinet lease $\rightarrow$ **State 2** (or **State 3** if dropped). |
-| **3. Auto-Reconnect** | Page lands on `/login` while `sessionArmed = true`. | Displays `"🔄 Auto-Reconnecting..."`. Automatically fills credentials and triggers Sign In (zero-click). | On success $\rightarrow$ **State 2**. On auth failure $\rightarrow$ Disarms to prevent loops. |
-| **4. Logout Recovery** | Page displays `"successfully log out"` or `/logout`. | Detects session termination. Displays redirection banner and immediately redirects to `/login`. | Redirects to `/login` $\rightarrow$ **State 3** (Auto-Reconnect). |
+| **3. Auto-Reconnect** | Page lands on portal login while `sessionArmed = true`. | Displays the green **`Auto-Continue`** banner, then automatically presses it after 700ms (zero-click). | On success $\rightarrow$ **State 2**. On auth failure $\rightarrow$ Disarms to prevent loops. |
+| **4. Logout Recovery** | Page displays `"successfully log out"` or `/logout`. | Detects session termination. Displays redirection banner and triggers captive portal gateway reload to restore login page. | Lands on portal login $\rightarrow$ **State 3** (Auto-Reconnect). |
 
 ---
 
 ## ✨ Features
 
-- **One-Click Initial Setup**: Enter your username/roll number and WiFi password once in the extension popup.
+- **One-Click Initial Setup**: Enter your username and WiFi password once in the extension popup.
 - **Configurable Keepalive Refresh**: Default refresh interval is set to **5 minutes** (recommended to comfortably beat Fortinet's ~37 min lease cycle). You can adjust this to any interval between 1 and 30 minutes in the popup.
-- **Zero-Click Autonomous Reconnection**: Once armed during your session, any network timeout or dropped session is automatically recovered without disturbing your workflow.
+- **Zero-Click Autonomous Reconnection**: Once armed during your session, any network timeout or dropped session is automatically recovered without disturbing your workflow. The green button appears and is automatically pressed.
 - **Visual Feedback**:
   - **Top Banner**: Clear visual indication during connection and reconnection.
   - **Keepalive Pill**: Shows exact countdown until next refresh, with a quick `[↻ Refresh]` button for instant manual refresh.
 - **Auth Error Safeguard**: Disarms automatically if an incorrect password error is detected, avoiding infinite submit loops.
-- **Manual Disarm**: Clicking Fortinet's native *"Terminate Session"* link gracefully disarms auto-reconnect so you stay logged out when intended.
 
 ---
 
@@ -100,7 +99,7 @@ stateDiagram-v2
 
 1. Click the **RVCE WiFi Auto-Login** icon in your browser toolbar.
 2. Enter your campus Wi-Fi credentials:
-   - **Username / Roll No**: e.g., `1rv23cs001`
+   - **Username**: Your campus Wi-Fi username
    - **Password**: Your campus Wi-Fi password
    - **Keepalive Refresh Interval**: `5` minutes (default)
 3. Click **Save Settings**.

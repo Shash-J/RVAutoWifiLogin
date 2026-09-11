@@ -27,9 +27,11 @@
   }
 
   function findLoginButton() {
-    const buttons = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+    const candidates = Array.from(
+      document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn, [role="button"]')
+    );
     return (
-      buttons.find((el) => {
+      candidates.find((el) => {
         const text = (el.innerText || el.value || "").trim().toLowerCase();
         return /sign in|sign-in|login|continue|submit|connect/.test(text);
       }) || document.querySelector('button[type="submit"], input[type="submit"]')
@@ -210,10 +212,15 @@
   function runStateMachine() {
     // STATE 4: LOGOUT RECOVERY
     if (isLogoutPage()) {
-      console.log("[RVCE State Machine] State: LOGOUT_RECOVERY");
-      injectTopBanner("🔄 Session logged out. Redirecting to RVCE login...", "#d97706", "default");
+      console.log("[RVCE State Machine] State: LOGOUT_RECOVERY - Session logged out. Triggering portal redirect...");
+      injectTopBanner("🔄 Session logged out. Reconnecting to RVCE WiFi...", "#28a745", "wait");
+
+      // When unauthenticated, navigating to a standard HTTP captive portal detection endpoint
+      // causes Fortinet to intercept and 307-redirect to https://172.16.0.2:1003/fgtauth?<token>.
+      // We avoid navigating to https://172.16.0.2:1003/login directly because Fortinet drops
+      // connections without tokens with ERR_EMPTY_RESPONSE.
       setTimeout(() => {
-        window.location.href = "https://172.16.0.2:1003/login";
+        window.location.replace("http://connectivitycheck.gstatic.com/generate_204");
       }, 500);
       return;
     }
@@ -225,17 +232,6 @@
       // Mark session as armed across page reloads and storage
       sessionStorage.setItem("rvce_session_armed", "true");
       chrome.storage.local.set({ sessionArmed: true, lastKeepalive: Date.now() });
-
-      // Listen for user manual termination to disarm
-      document.querySelectorAll("a").forEach((link) => {
-        if (/terminate session|logout/i.test(link.innerText || "")) {
-          link.addEventListener("click", () => {
-            console.log("[RVCE State Machine] User manually terminated session. Disarming.");
-            sessionStorage.removeItem("rvce_session_armed");
-            chrome.storage.local.set({ sessionArmed: false });
-          });
-        }
-      });
 
       // Load user configured refresh interval (default 5 min)
       chrome.storage.local.get(["refreshInterval"], (result) => {
@@ -268,7 +264,7 @@
     if (isLoginPage()) {
       // Check for authentication failure errors
       if (hasAuthError()) {
-        console.warn("[RVCE State Machine] Authentication failed detected. Disarming auto-login to prevent loop.");
+        console.warn("[RVCE State Machine] Authentication failure detected. Disarming auto-login to prevent loop.");
         sessionStorage.removeItem("rvce_session_armed");
         chrome.storage.local.set({ sessionArmed: false });
         injectTopBanner("❌ Authentication Failed: Please check your credentials in the extension popup.", "#dc2626", "default");
@@ -281,56 +277,51 @@
         const storageArmed = storageData.sessionArmed === true && (Date.now() - (storageData.lastKeepalive || 0) < 12 * 3600 * 1000);
         const isArmed = sessionArmedLocal || storageArmed;
 
+        // Always show the green "Auto-Continue" button first
+        const banner = injectTopBanner("Auto-Continue", "#28a745", "pointer");
+
+        banner.addEventListener("mouseenter", () => {
+          banner.style.backgroundColor = "#218838";
+        });
+        banner.addEventListener("mouseleave", () => {
+          banner.style.backgroundColor = "#28a745";
+        });
+
+        const executeLogin = () => {
+          banner.textContent = "Connecting...";
+          banner.style.backgroundColor = "#16a34a";
+
+          // Arm the session
+          sessionStorage.setItem("rvce_session_armed", "true");
+          chrome.storage.local.set({ sessionArmed: true, lastKeepalive: Date.now() });
+
+          performLogin(
+            storageData,
+            () => {
+              banner.textContent = "Connecting to RVCE WiFi...";
+            },
+            (errMessage) => {
+              alert(errMessage);
+              banner.textContent = "Auto-Continue";
+              banner.style.backgroundColor = "#28a745";
+              sessionStorage.removeItem("rvce_session_armed");
+              chrome.storage.local.set({ sessionArmed: false });
+            }
+          );
+        };
+
+        banner.addEventListener("click", executeLogin);
+
         if (isArmed) {
-          // STATE 3: AUTO_RECONNECT (Zero-click)
-          console.log("[RVCE State Machine] State: AUTO_RECONNECT (Session armed). Triggering zero-click login.");
-          const banner = injectTopBanner("🔄 RVCE WiFi: Auto-Reconnecting...", "#2563eb", "wait");
-
+          // STATE 3: AUTO_RECONNECT
+          // Green button appears, then automatically presses after 700ms to allow DOM to settle
+          console.log("[RVCE State Machine] State: AUTO_RECONNECT (Session armed). Auto-pressing Auto-Continue button in 700ms.");
           setTimeout(() => {
-            performLogin(
-              storageData,
-              () => {
-                banner.textContent = "Connecting to RVCE WiFi...";
-                banner.style.backgroundColor = "#16a34a";
-              },
-              (errMessage) => {
-                banner.textContent = "⚠️ " + errMessage;
-                banner.style.backgroundColor = "#dc2626";
-              }
-            );
-          }, 600);
+            executeLogin();
+          }, 700);
         } else {
-          // STATE 1: COLD_START_LOGIN (Manual user prompt)
-          console.log("[RVCE State Machine] State: COLD_START_LOGIN. Showing Auto-Continue banner.");
-          const banner = injectTopBanner("Auto-Continue", "#28a745", "pointer");
-
-          banner.addEventListener("mouseenter", () => {
-            banner.style.backgroundColor = "#218838";
-          });
-          banner.addEventListener("mouseleave", () => {
-            banner.style.backgroundColor = "#28a745";
-          });
-
-          banner.addEventListener("click", () => {
-            banner.textContent = "Connecting...";
-            banner.style.backgroundColor = "#16a34a";
-
-            // Arm the session
-            sessionStorage.setItem("rvce_session_armed", "true");
-            chrome.storage.local.set({ sessionArmed: true, lastKeepalive: Date.now() });
-
-            performLogin(
-              storageData,
-              null,
-              (errMessage) => {
-                alert(errMessage);
-                banner.textContent = "Auto-Continue";
-                banner.style.backgroundColor = "#28a745";
-                sessionStorage.removeItem("rvce_session_armed");
-                chrome.storage.local.set({ sessionArmed: false });
-              }
-            );
-          });
+          // STATE 1: COLD_START_LOGIN
+          console.log("[RVCE State Machine] State: COLD_START_LOGIN. Waiting for single manual user click.");
         }
       });
 
