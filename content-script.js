@@ -6,6 +6,8 @@
  * 2. SESSION_ACTIVE   : On /keepalive page. Displays countdown pill and auto-reloads every N minutes.
  * 3. AUTO_RECONNECT   : On /login with session armed. Automatically fills and signs in (zero-click).
  * 4. LOGOUT_RECOVERY  : On "successfully log out" page. Immediately redirects to login.
+ * 
+ * Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
  */
 
 (function () {
@@ -14,6 +16,7 @@
   console.log("[RVCE Auto-Login Engine v2.1.0] Initializing on:", window.location.href);
 
   // --- Helper Selectors ---
+  // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
   function findUsernameField() {
     return document.querySelector(
       'input[name="username"], input[name="user"], input[name="auth_user"], input[placeholder*="Username" i], input[type="text"], input[type="email"]'
@@ -47,6 +50,7 @@
   }
 
   // --- Page Classification ---
+  // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
   function isLogoutPage() {
     const text = document.body ? document.body.innerText.toLowerCase() : "";
     const url = window.location.href.toLowerCase();
@@ -179,6 +183,7 @@
   }
 
   // --- Perform Login Routine ---
+  // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
   function performLogin(data, onSuccess, onFail) {
     if (!data.username || !data.password) {
       if (onFail) onFail("No credentials configured. Please enter them in the extension popup.");
@@ -209,6 +214,7 @@
   }
 
   // --- Main State Machine Controller ---
+  // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
   function runStateMachine() {
     // STATE 4: LOGOUT RECOVERY
     if (isLogoutPage()) {
@@ -276,6 +282,7 @@
     }
 
     // STATE 2: SESSION ACTIVE (Keepalive Page)
+    // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
     if (isKeepalivePage()) {
       console.log("[RVCE State Machine] State: SESSION_ACTIVE");
 
@@ -311,6 +318,7 @@
     }
 
     // STATE 1 & STATE 3: LOGIN PAGE
+    // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
     if (isLoginPage()) {
       // Check for authentication failure errors
       if (hasAuthError()) {
@@ -382,6 +390,7 @@
   }
 
   // Run on DOM ready
+  // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", runStateMachine);
   } else {

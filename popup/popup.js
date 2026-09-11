@@ -1,4 +1,8 @@
+// RVCE WiFi Auto-Login Popup Controller
+// Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
+
 document.addEventListener("DOMContentLoaded", function () {
+    // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
     const extVersionEl = document.getElementById("extVersion");
     if (extVersionEl && chrome.runtime && chrome.runtime.getManifest) {
         extVersionEl.textContent = `v${chrome.runtime.getManifest().version}`;
