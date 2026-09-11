@@ -51,15 +51,22 @@ The extension operates on an autonomous 4-state finite state machine (FSM):
 
 ## 🚀 Installation Guide
 
-1. Clone or download this repository:
+### Option 1: Microsoft Edge Add-ons Store *(Official Store • In Review)*
+- **Store ID**: `9RDCKF4N78VR`
+- Submitted and currently in certification review. Once published, Edge users on campus can install with a single 1-click **"Get"** button!
+
+### Option 2: Direct Install (Google Chrome, Brave, Edge, Opera)
+1. Download or clone this repository:
    ```bash
    git clone https://github.com/Shash-J/RVAutoWifiLogin.git
    ```
-2. Open Google Chrome (or Chromium-based browsers like Brave, Edge, Opera).
-3. Navigate to `chrome://extensions/` in your address bar.
-4. Toggle **Developer mode** in the top-right corner.
-5. Click **Load unpacked** in the top-left corner.
-6. Select the `RVAutoWifiLogin` folder.
+   *(or click the green **Code** $\rightarrow$ **Download ZIP** button above and extract the folder)*.
+2. Open your browser and navigate to:
+   - Chrome: `chrome://extensions/`
+   - Edge: `edge://extensions/`
+3. Toggle **Developer mode** on (top-right switch).
+4. Click **Load unpacked** (top-left button).
+5. Select the extracted `RVAutoWifiLogin` directory.
 
 ---
 
