@@ -1,4 +1,4 @@
-# RVCE WiFi Auto-Login Engine (v2.1.0)
+# RVCE WiFi Auto-Login Engine (v2.2.0)
 
 An open-source Chrome Extension designed for RV College of Engineering (RVCE) students and faculty. It automates authentication on the campus Fortinet captive portal (`https://172.16.0.2:1003`), runs a background keepalive refresh loop, and autonomously reconnects when sessions expire.
 
@@ -40,6 +40,7 @@ The extension operates on an autonomous 4-state finite state machine (FSM):
 ## ✨ Features
 
 - **One-Click Initial Setup**: Enter your username and WiFi password once in the extension popup.
+- **Customizable Portal Gateway IP**: Target any campus block or custom gateway (default: `172.16.0.2:1003`) with interactive safety confirmation dialogs to prevent accidental misconfigurations.
 - **Configurable Keepalive Refresh**: Default refresh interval is set to **5 minutes** (recommended to comfortably beat Fortinet's ~37 min lease cycle). You can adjust this to any interval between 1 and 30 minutes in the popup.
 - **Zero-Click Autonomous Reconnection**: Once armed during your session, any network timeout or dropped session is automatically recovered without disturbing your workflow. The green button appears and is automatically pressed.
 - **Visual Feedback**:
@@ -115,7 +116,8 @@ RVAutoWifiLogin/
 
 | Version | Date | Key Highlights |
 | :--- | :--- | :--- |
-| **v2.1.0** | Current | • Added State 4 stuck-request cancellation using `window.stop()`.<br>• 3-second watchdog retry loop with multi-endpoint captive portal rotation (`http://1.1.1.1`, Android `generate_204`, Windows `msftconnecttest`).<br>• Cleaned extension logging (replaced `console.warn` with `console.log` to prevent Chrome Extensions error page flags).<br>• Added dynamic version badge in popup header synced with `manifest.json`. |
+| **v2.2.0** | Current | • Added customizable Portal Gateway IP/Host setting with instant "Reset Default" shortcut.<br>• Added interactive safety confirmation popup modal warning users before changing away from the campus standard `172.16.0.2:1003`.<br>• Implemented dynamic runtime content script injection via Manifest V3 `chrome.scripting` API.<br>• Clean modern modal styling with responsive popup UI controls. |
+| **v2.1.0** | Prev | • Added State 4 stuck-request cancellation using `window.stop()`.<br>• 3-second watchdog retry loop with multi-endpoint captive portal rotation (`http://1.1.1.1`, Android `generate_204`, Windows `msftconnecttest`).<br>• Cleaned extension logging (replaced `console.warn` with `console.log` to prevent Chrome Extensions error page flags).<br>• Added dynamic version badge in popup header synced with `manifest.json`. |
 | **v2.0.0** | Prev | • Implemented autonomous 4-state engine (Cold Start, Session Active, Auto-Reconnect, Logout Recovery).<br>• Added configurable keepalive timer (1–30 min, default 5 min).<br>• Purged all hardcoded personal credentials for safe public open-source distribution.<br>• Standardized terminology to strictly "Username". |
 | **v1.0.0** | Initial | • Basic single-click credentials autofill banner. |
 

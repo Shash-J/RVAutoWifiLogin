@@ -1,5 +1,5 @@
 /**
- * RVCE WiFi Auto-Login State Machine Engine (v2.1.0)
+ * RVCE WiFi Auto-Login State Machine Engine (v2.2.0)
  * 
  * States:
  * 1. COLD_START_LOGIN : First connect / laptop boot. Prompts user with "Auto-Continue" green banner.
@@ -13,7 +13,7 @@
 (function () {
   "use strict";
 
-  console.log("[RVCE Auto-Login Engine v2.1.0] Initializing on:", window.location.href);
+  console.log("[RVCE Auto-Login Engine v2.2.0] Initializing on:", window.location.href);
 
   // --- Helper Selectors ---
   // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
