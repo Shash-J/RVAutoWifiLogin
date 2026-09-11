@@ -21,7 +21,7 @@ At RVCE, campus Wi-Fi sessions expire periodically (typically every ~37 minutes 
 The extension operates on an autonomous 4-state finite state machine (FSM):
 
 <p align="center">
-  <img src="assets/state_machine_diagram.jpg" alt="RVCE WiFi Auto-Login State Machine Architecture" width="100%" />
+  <img src="./assets/state_machine_diagram.jpg" alt="RVCE WiFi Auto-Login State Machine Architecture" width="100%" />
 </p>
 
 ### Detailed State Breakdown
