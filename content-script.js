@@ -212,16 +212,66 @@
   function runStateMachine() {
     // STATE 4: LOGOUT RECOVERY
     if (isLogoutPage()) {
-      console.log("[RVCE State Machine] State: LOGOUT_RECOVERY - Session logged out. Triggering portal redirect...");
-      injectTopBanner("🔄 Session logged out. Reconnecting to RVCE WiFi...", "#28a745", "wait");
+      console.log("[RVCE State Machine] State: LOGOUT_RECOVERY - Session logged out.");
 
-      // When unauthenticated, navigating to a standard HTTP captive portal detection endpoint
-      // causes Fortinet to intercept and 307-redirect to https://172.16.0.2:1003/fgtauth?<token>.
-      // We avoid navigating to https://172.16.0.2:1003/login directly because Fortinet drops
-      // connections without tokens with ERR_EMPTY_RESPONSE.
-      setTimeout(() => {
-        window.location.replace("http://connectivitycheck.gstatic.com/generate_204");
-      }, 500);
+      let attempts = 0;
+      const banner = injectTopBanner("🔄 Session logged out. Reconnecting to RVCE WiFi...", "#28a745", "pointer");
+
+      const endpoints = [
+        "http://1.1.1.1",
+        "http://connectivitycheck.gstatic.com/generate_204",
+        "http://1.0.0.1",
+        "http://www.msftconnecttest.com/redirect"
+      ];
+
+      const attemptRecovery = () => {
+        attempts++;
+        console.log(`[RVCE State Machine] Recovery attempt #${attempts}. Cancelling any hanging request and refreshing...`);
+
+        // 1. Cancel any currently hanging/stuck network request
+        try {
+          window.stop();
+        } catch (e) {
+          console.warn("[RVCE State Machine] window.stop failed:", e);
+        }
+
+        banner.textContent = attempts > 1
+          ? `🔄 Reconnecting to RVCE WiFi (Retrying #${attempts})... Click to force retry`
+          : "🔄 Session logged out. Reconnecting to RVCE WiFi...";
+
+        // Use raw IP first (http://1.1.1.1) to avoid DNS stalls when unauthenticated.
+        // Fortinet intercepts port 80 traffic immediately and redirects to /fgtauth?<token>.
+        const targetUrl = endpoints[(attempts - 1) % endpoints.length];
+
+        // Give browser 50ms to cleanly cancel pending socket before initiating next navigation
+        setTimeout(() => {
+          try {
+            window.location.replace(targetUrl);
+          } catch (e) {
+            window.location.href = targetUrl;
+          }
+        }, 50);
+      };
+
+      // Click to force immediate retry
+      banner.addEventListener("click", () => {
+        attemptRecovery();
+      });
+
+      // Initial recovery trigger
+      setTimeout(attemptRecovery, 400);
+
+      // Watchdog: If the browser gets stuck on the logout screen,
+      // cancel the hanging request via window.stop() and retry every 3 seconds!
+      const watchdogTimer = setInterval(() => {
+        if (isLogoutPage()) {
+          console.warn("[RVCE State Machine] Stuck on logout page. Cancelling hanging request and retrying...");
+          attemptRecovery();
+        } else {
+          clearInterval(watchdogTimer);
+        }
+      }, 3000);
+
       return;
     }
 

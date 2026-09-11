@@ -49,12 +49,12 @@ stateDiagram-v2
     }
 
     state "State 4: Logout Recovery" as LogoutRecovery {
-        KeepaliveMonitor --> LoggedOutPage : Server drops session / Logout page
+        KeepaliveMonitor --> LoggedOutPage : Session dropped / Logout page
         LoggedOutPage : Detects "successfully log out"
-        LoggedOutPage --> AutoLoginPage : Immediate redirect to /login
+        LoggedOutPage --> AutoLoginPage : Cancel hung requests (window.stop) & watchdog retry
     }
 
-    KeepaliveMonitor --> UserDisarmed : User clicks "Terminate Session" / Clears credentials
+    KeepaliveMonitor --> UserDisarmed : Auth failure or "Clear Credentials"
     UserDisarmed --> ColdStart : sessionArmed set to false
 ```
 
@@ -65,7 +65,7 @@ stateDiagram-v2
 | **1. Cold Start Login** | First visit to login portal after opening laptop (`sessionArmed = false`). | Injects the top green banner: **`Auto-Continue`**. Waits for user click. | On click $\rightarrow$ Arms session, fills credentials, clicks Sign In $\rightarrow$ **State 2**. |
 | **2. Session Active** | Browser lands on `/keepalive` with active session. | Injects a floating status pill (`🛡️ RVCE Keepalive Active • Refresh in 4:59`). Runs countdown. | When timer expires $\rightarrow$ reloads page to reset Fortinet lease $\rightarrow$ **State 2** (or **State 3** if dropped). |
 | **3. Auto-Reconnect** | Page lands on portal login while `sessionArmed = true`. | Displays the green **`Auto-Continue`** banner, then automatically presses it after 700ms (zero-click). | On success $\rightarrow$ **State 2**. On auth failure $\rightarrow$ Disarms to prevent loops. |
-| **4. Logout Recovery** | Page displays `"successfully log out"` or `/logout`. | Detects session termination. Displays redirection banner and triggers captive portal gateway reload to restore login page. | Lands on portal login $\rightarrow$ **State 3** (Auto-Reconnect). |
+| **4. Logout Recovery** | Page displays `"successfully log out"` or `/logout`. | Detects session termination. Displays redirection banner, cancels any hanging requests via `window.stop()`, and runs an automated watchdog retry loop every 3s to restore the login page. | Lands on portal login $\rightarrow$ **State 3** (Auto-Reconnect). |
 
 ---
 
