@@ -19,7 +19,15 @@
             color: #0f172a;
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: space-between;
+        }
+        .badge-version {
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 2px 6px;
+            border-radius: 4px;
         }
         .subtitle {
             font-size: 0.78rem;
@@ -100,7 +108,10 @@
     </style>
 </head>
 <body>
-    <h2>📶 RVCE WiFi Auto-Login</h2>
+    <h2>
+        <span>📶 RVCE Auto-Login</span>
+        <span id="extVersion" class="badge-version">v2.1.0</span>
+    </h2>
     <div class="subtitle">Autonomous Keepalive & Auto-Connect Engine</div>
     <div id="status">Loading configuration...</div>
     

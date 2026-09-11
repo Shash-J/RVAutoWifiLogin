@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RVCE WiFi Auto-Login",
-  "version": "2.0",
+  "version": "2.1.0",
   "description": "Autonomous State-Machine Auto-Login and Session Refresh Engine for RVCE WiFi",
   "permissions": ["storage"],
   "background": {

@@ -1,4 +1,9 @@
 document.addEventListener("DOMContentLoaded", function () {
+    const extVersionEl = document.getElementById("extVersion");
+    if (extVersionEl && chrome.runtime && chrome.runtime.getManifest) {
+        extVersionEl.textContent = `v${chrome.runtime.getManifest().version}`;
+    }
+
     const usernameInput = document.getElementById("username");
     const passwordInput = document.getElementById("password");
     const refreshIntervalInput = document.getElementById("refreshInterval");

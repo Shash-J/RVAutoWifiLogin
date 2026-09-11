@@ -1,4 +1,4 @@
-# RVCE WiFi Auto-Login Engine (v2.0)
+# RVCE WiFi Auto-Login Engine (v2.1.0)
 
 An open-source Chrome Extension designed for RV College of Engineering (RVCE) students and faculty. It automates authentication on the campus Fortinet captive portal (`https://172.16.0.2:1003`), runs a background keepalive refresh loop, and autonomously reconnects when sessions expire.
 
@@ -131,6 +131,16 @@ RVAutoWifiLogin/
 ├── manifest.json         # Manifest V3 extension configuration
 └── README.md             # Project documentation
 ```
+
+---
+
+## 📦 Version History
+
+| Version | Date | Key Highlights |
+| :--- | :--- | :--- |
+| **v2.1.0** | Current | • Added State 4 stuck-request cancellation using `window.stop()`.<br>• 3-second watchdog retry loop with multi-endpoint captive portal rotation (`http://1.1.1.1`, Android `generate_204`, Windows `msftconnecttest`).<br>• Cleaned extension logging (replaced `console.warn` with `console.log` to prevent Chrome Extensions error page flags).<br>• Added dynamic version badge in popup header synced with `manifest.json`. |
+| **v2.0.0** | Prev | • Implemented autonomous 4-state engine (Cold Start, Session Active, Auto-Reconnect, Logout Recovery).<br>• Added configurable keepalive timer (1–30 min, default 5 min).<br>• Purged all hardcoded personal credentials for safe public open-source distribution.<br>• Standardized terminology to strictly "Username". |
+| **v1.0.0** | Initial | • Basic single-click credentials autofill banner. |
 
 ---
 

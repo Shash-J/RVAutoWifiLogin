@@ -1,6 +1,7 @@
 // RVCE WiFi Auto-Login Service Worker
 chrome.runtime.onInstalled.addListener(() => {
-    console.log("RVCE WiFi Auto-Login Extension Installed/Updated.");
+    const version = chrome.runtime.getManifest().version;
+    console.log(`RVCE WiFi Auto-Login Extension Installed/Updated: v${version}`);
 
     // Initialize default settings if not already present
     chrome.storage.local.get(["refreshInterval"], (result) => {
