@@ -232,7 +232,7 @@
         try {
           window.stop();
         } catch (e) {
-          console.warn("[RVCE State Machine] window.stop failed:", e);
+          console.log("[RVCE State Machine] window.stop failed:", e);
         }
 
         banner.textContent = attempts > 1
@@ -265,7 +265,7 @@
       // cancel the hanging request via window.stop() and retry every 3 seconds!
       const watchdogTimer = setInterval(() => {
         if (isLogoutPage()) {
-          console.warn("[RVCE State Machine] Stuck on logout page. Cancelling hanging request and retrying...");
+          console.log("[RVCE State Machine] Stuck on logout page. Cancelling hanging request and retrying...");
           attemptRecovery();
         } else {
           clearInterval(watchdogTimer);
@@ -314,7 +314,7 @@
     if (isLoginPage()) {
       // Check for authentication failure errors
       if (hasAuthError()) {
-        console.warn("[RVCE State Machine] Authentication failure detected. Disarming auto-login to prevent loop.");
+        console.log("[RVCE State Machine] Authentication failure detected. Disarming auto-login to prevent loop.");
         sessionStorage.removeItem("rvce_session_armed");
         chrome.storage.local.set({ sessionArmed: false });
         injectTopBanner("❌ Authentication Failed: Please check your credentials in the extension popup.", "#dc2626", "default");
