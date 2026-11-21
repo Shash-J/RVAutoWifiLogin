@@ -1,17 +1,18 @@
-// RVCE WiFi Auto-Login Service Worker (v2.3.1)
+// RVCE WiFi Auto-Login Service Worker (v2.3.2)
 // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
 
 const DEFAULT_PORTAL_IP = "172.16.0.4:8090"; // RVCE Sophos Gateway
 const BUILTIN_PORTAL_IPS = ["172.16.0.4:8090", "172.16.0.2:1003", "172.16.0.4", "172.16.0.2"];
 const SCRIPT_ID = "rvce-dynamic-portal-script";
+const BRIDGE_SCRIPT_ID = "rvce-dynamic-bridge-script";
 
 async function syncDynamicContentScript(portalIp) {
     if (!chrome.scripting || !chrome.scripting.registerContentScripts) return;
 
     try {
-        const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [SCRIPT_ID] });
+        const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [SCRIPT_ID, BRIDGE_SCRIPT_ID] });
         if (existing && existing.length > 0) {
-            await chrome.scripting.unregisterContentScripts({ ids: [SCRIPT_ID] });
+            await chrome.scripting.unregisterContentScripts({ ids: [SCRIPT_ID, BRIDGE_SCRIPT_ID] });
             console.log("[RVCE Service Worker] Unregistered previous dynamic script.");
         }
     } catch (e) {
@@ -29,6 +30,14 @@ async function syncDynamicContentScript(portalIp) {
                     matches: [`http://${cleanHost}/*`, `https://${cleanHost}/*`],
                     js: ["content-script.js"],
                     runAt: "document_end",
+                    persistAcrossSessions: true
+                },
+                {
+                    id: BRIDGE_SCRIPT_ID,
+                    matches: [`http://${cleanHost}/*`, `https://${cleanHost}/*`],
+                    js: ["page-bridge.js"],
+                    world: "MAIN",
+                    runAt: "document_start",
                     persistAcrossSessions: true
                 }
             ]);

@@ -1,5 +1,5 @@
 /**
- * RVCE WiFi Auto-Login State Machine Engine (v2.3.1)
+ * RVCE WiFi Auto-Login State Machine Engine (v2.3.2)
  * 
  * Multi-Gateway Reactive Engine:
  * - Sophos Cyberoam / Sophos Firewall Portal (172.16.0.4:8090, httpclient.html)
@@ -18,7 +18,23 @@
 (function () {
   "use strict";
 
-  console.log("[RVCE Auto-Login Engine v2.3.1] Initializing on:", window.location.href);
+  console.log("[RVCE Auto-Login Engine v2.3.2] Initializing on:", window.location.href);
+
+  // Ensure Page Bridge is injected into the DOM (Main World context)
+  function ensureBridgeLoaded() {
+    if (document.getElementById("rvce-page-bridge")) return;
+    try {
+      const script = document.createElement("script");
+      script.id = "rvce-page-bridge";
+      script.src = chrome.runtime.getURL("page-bridge.js");
+      (document.head || document.documentElement).appendChild(script);
+      console.log("[RVCE Auto-Login] Page bridge script attached.");
+    } catch (e) {
+      console.log("[RVCE Auto-Login] Bridge injection notice:", e);
+    }
+  }
+
+  ensureBridgeLoaded();
 
   // --- Helper Selectors & Utilities ---
   // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
@@ -165,48 +181,16 @@
 
   /**
    * Universal Submit Trigger
-   * Bypasses Chrome isolated-world restrictions on programmatic javascript: URL clicks
-   * by directly injecting script execution into the page's MAIN JavaScript context.
+   * Fully CSP-compliant: Communicates with page-bridge in Main World to invoke native submitRequest().
+   * NEVER triggers programmatic navigation on javascript: URLs, avoiding Chrome Extension CSP errors.
    */
   function triggerUniversalSubmit(loginButton) {
-    console.log("[RVCE Auto-Login] Triggering universal submission...");
+    console.log("[RVCE Auto-Login] Dispatching universal submit...");
 
-    // 1. Direct Script Injection in Page DOM (executes in page's MAIN context)
-    const scriptContent = `
-      (function() {
-        try {
-          if (typeof submitRequest === 'function') {
-            console.log('[RVCE Auto-Login] Invoked native submitRequest()');
-            submitRequest();
-            return;
-          }
-          const a = document.querySelector('a[href*="submitRequest"]');
-          if (a) {
-            const href = a.getAttribute('href') || '';
-            if (href.startsWith('javascript:')) {
-              eval(href.substring(11));
-              return;
-            }
-          }
-          const btn = document.getElementById('loginbutton') ||
-                      document.querySelector('button[type="submit"], input[type="submit"], [role="button"]');
-          if (btn) btn.click();
-        } catch(e) {
-          console.log('[RVCE Auto-Login] Native submit exception:', e);
-        }
-      })();
-    `;
+    // 1. Dispatch DOM event to Main World bridge
+    window.dispatchEvent(new CustomEvent("RVCE_TRIGGER_LOGIN"));
 
-    try {
-      const scriptEl = document.createElement("script");
-      scriptEl.textContent = scriptContent;
-      (document.head || document.documentElement).appendChild(scriptEl);
-      scriptEl.remove();
-    } catch (e) {
-      console.log("[RVCE Auto-Login] DOM script injection notice:", e);
-    }
-
-    // 2. Background Service Worker MAIN world execution (Manifest V3 scripting API)
+    // 2. Background service worker execution in Main World (Manifest V3)
     try {
       if (chrome.runtime && chrome.runtime.sendMessage) {
         chrome.runtime.sendMessage({ action: "executeInMainWorld" }, (res) => {
@@ -215,26 +199,21 @@
       }
     } catch (e) {}
 
-    // 3. Fallback programmatic clicks & mouse event dispatches
+    // 3. For standard buttons / inputs (NOT javascript: links), dispatch standard clicks
     if (loginButton) {
-      try {
-        loginButton.focus();
-      } catch (e) {}
-
-      loginButton.click();
-
       const parentLink = loginButton.closest("a");
-      if (parentLink && parentLink !== loginButton) {
+      const isJavascriptLink = (
+        (loginButton.tagName === "A" && (loginButton.getAttribute("href") || "").toLowerCase().startsWith("javascript:")) ||
+        (parentLink && (parentLink.getAttribute("href") || "").toLowerCase().startsWith("javascript:"))
+      );
+
+      // Do NOT invoke .click() on javascript: URLs from isolated world to prevent CSP violations
+      if (!isJavascriptLink) {
         try {
-          parentLink.click();
+          loginButton.focus();
+          loginButton.click();
         } catch (e) {}
       }
-
-      try {
-        loginButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-        loginButton.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-        loginButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      } catch (e) {}
     }
 
     // 4. Form submit fallback
@@ -483,10 +462,9 @@
 
       if (onSuccess) onSuccess();
 
-      // Short delay for DOM field binding, then trigger universal submission
       setTimeout(() => {
         triggerUniversalSubmit(loginButton);
-      }, 350);
+      }, 300);
     } else {
       if (onFail) onFail("Login input fields could not be found.");
     }
@@ -542,7 +520,6 @@
   function handleSessionActive() {
     console.log("[RVCE State Machine] Entering State: SESSION_ACTIVE");
 
-    // Clean up login banner & timers
     removeTopBanner();
     if (activeConnectingTimeout) {
       clearTimeout(activeConnectingTimeout);
@@ -555,25 +532,17 @@
     const isSophos = window.location.href.includes("httpclient.html") || !!document.getElementById("donotclosepage");
     const gatewayLabel = isSophos ? "Sophos" : "Fortinet";
 
-    // Neutralize Sophos onbeforeunload logout beacon
-    if (isSophos) {
-      try {
-        window.onbeforeunload = null;
-        const script = document.createElement("script");
-        script.textContent = "window.onbeforeunload = null;";
-        (document.head || document.documentElement).appendChild(script);
-        script.remove();
-        console.log("[RVCE Auto-Login] Neutralized Sophos onbeforeunload.");
-      } catch (e) {}
-    }
-
     chrome.storage.local.get(["refreshInterval", "username"], (result) => {
       const intervalMinutes = (result.refreshInterval && result.refreshInterval >= 1) ? result.refreshInterval : 5;
       let remainingSeconds = intervalMinutes * 60;
 
       const performRefresh = () => {
+        console.log("[RVCE Auto-Login] Performing keepalive refresh...");
+        // 1. Dispatch event to Page Bridge
+        window.dispatchEvent(new CustomEvent("RVCE_TRIGGER_REFRESH"));
+
+        // 2. Also execute backup ping if on Sophos
         if (isSophos) {
-          console.log("[RVCE Auto-Login] Refreshing Sophos live session ping...");
           const username = result.username || document.getElementById("username")?.value || "";
           const pingUrl = `/live?mode=192&username=${encodeURIComponent(username.toLowerCase())}&a=${Date.now()}`;
           fetch(pingUrl, { method: "GET" })
@@ -583,13 +552,9 @@
               remainingSeconds = intervalMinutes * 60;
               injectKeepaliveBadge(remainingSeconds, performRefresh, gatewayLabel);
             })
-            .catch((err) => {
-              console.log("[RVCE Auto-Login] Sophos ping notice:", err);
+            .catch(() => {
               remainingSeconds = intervalMinutes * 60;
             });
-        } else {
-          console.log("[RVCE Auto-Login] Reloading Fortinet keepalive page...");
-          window.location.reload();
         }
       };
 
@@ -645,7 +610,6 @@
         sessionStorage.setItem("rvce_session_armed", "true");
         chrome.storage.local.set({ sessionArmed: true, lastKeepalive: Date.now() });
 
-        // Safeguard watchdog: If page remains on login after 8 seconds, provide instant retry
         if (activeConnectingTimeout) clearTimeout(activeConnectingTimeout);
         activeConnectingTimeout = setTimeout(() => {
           if (isLoginPage()) {
@@ -673,7 +637,7 @@
       banner.addEventListener("click", executeLogin);
 
       if (isArmed) {
-        console.log("[RVCE State Machine] State: AUTO_RECONNECT (Session armed). Auto-pressing Auto-Continue in 600ms.");
+        console.log("[RVCE State Machine] State: AUTO_RECONNECT (Session armed). Auto-pressing in 600ms.");
         setTimeout(executeLogin, 600);
       } else {
         console.log("[RVCE State Machine] State: COLD_START_LOGIN. Waiting for single user click.");
@@ -686,6 +650,8 @@
   let debouncedStateCheck = null;
 
   function runReactiveStateMachine() {
+    ensureBridgeLoaded();
+
     if (isKeepalivePage()) {
       if (currentState !== "ACTIVE") {
         currentState = "ACTIVE";
@@ -709,7 +675,6 @@
     debouncedStateCheck = setTimeout(runReactiveStateMachine, 120);
   }
 
-  // Observe DOM mutations to reactively catch AJAX state transitions (e.g. Sophos single-page login)
   const domObserver = new MutationObserver(() => {
     scheduleStateCheck();
   });
@@ -726,7 +691,6 @@
       });
     }
 
-    // Safety polling interval every 1.5s
     setInterval(runReactiveStateMachine, 1500);
   }
 

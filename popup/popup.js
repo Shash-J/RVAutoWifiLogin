@@ -1,4 +1,4 @@
-// RVCE WiFi Auto-Login Popup Controller (v2.3.1)
+// RVCE WiFi Auto-Login Popup Controller (v2.3.2)
 // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
 
 document.addEventListener("DOMContentLoaded", function () {
