@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RVCE WiFi Auto-Login",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Autonomous State-Machine Auto-Login and Session Refresh Engine for RVCE WiFi (Sophos & Fortinet)",
   "permissions": ["storage", "scripting"],
   "optional_host_permissions": ["*://*/*"],

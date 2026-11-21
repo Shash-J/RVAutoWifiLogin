@@ -1,7 +1,7 @@
 /**
- * RVCE WiFi Auto-Login State Machine Engine (v2.3.0)
+ * RVCE WiFi Auto-Login State Machine Engine (v2.3.1)
  * 
- * Multi-Gateway Support:
+ * Multi-Gateway Reactive Engine:
  * - Sophos Cyberoam / Sophos Firewall Portal (172.16.0.4:8090, httpclient.html)
  * - Fortinet FortiGate Captive Portal (172.16.0.2:1003, /keepalive, /fgtauth)
  * - Generic Captive Portals
@@ -18,7 +18,7 @@
 (function () {
   "use strict";
 
-  console.log("[RVCE Auto-Login Engine v2.3.0] Initializing on:", window.location.href);
+  console.log("[RVCE Auto-Login Engine v2.3.1] Initializing on:", window.location.href);
 
   // --- Helper Selectors & Utilities ---
   // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
@@ -47,7 +47,6 @@
       const visible = elements.find(isVisible);
       if (visible) return visible;
     }
-    // Fallback to first matching in DOM if none computed as visible yet
     return document.querySelector(selectors.join(", "));
   }
 
@@ -72,11 +71,8 @@
 
   /**
    * Universal Login / Sign-In Button Finder
-   * Supports:
-   * 1. Sophos Cyberoam / Sophos Firewall: <div id="loginbutton" class="button"> inside <a href="javascript:submitRequest()">
-   * 2. Fortinet FortiGate: <input type="submit">, <button type="submit">
-   * 3. Generic & Custom Portals: buttons, links, inputs matching sign-in / continue / submit
-   * Strict Exclusion: Explicitly rejects "Sign out" / "Log out" / "Disconnect" buttons.
+   * Multi-tier algorithm prioritizing Sophos, Fortinet, and custom portals.
+   * Strictly excludes "Sign out" / "Logout" buttons.
    */
   function findLoginButton() {
     // Tier 1: Dedicated ID & Known Gateway Selectors
@@ -102,7 +98,6 @@
       const el = document.querySelector(sel);
       if (el) {
         const text = (el.innerText || el.textContent || el.value || "").trim().toLowerCase();
-        // Crucial safety: do NOT return if it says "sign out" or "logout"
         if (!/sign[\s-]?out|log[\s-]?out|disconnect/i.test(text)) {
           return el;
         }
@@ -123,17 +118,15 @@
         ""
       ).trim().toLowerCase();
 
-      // Explicitly reject logout / cancel buttons
+      // Reject logout / cancel buttons
       if (/sign[\s-]?out|log[\s-]?out|disconnect|cancel/i.test(text)) {
         return false;
       }
 
-      // Check for positive login / continue keywords
       if (/sign[\s-]?in|sign-in|log[\s-]?in|log-in|submit|continue|connect|authenticate|credential login|proceed|access internet/i.test(text)) {
         return true;
       }
 
-      // Check onclick or href attributes
       const onclickAttr = el.getAttribute("onclick") || "";
       const hrefAttr = el.getAttribute("href") || "";
       if (/submitRequest|validateLogin|doLogin|login|auth/i.test(onclickAttr + hrefAttr)) {
@@ -170,37 +163,92 @@
     return null;
   }
 
-  function triggerButtonClick(btn) {
-    if (!btn) return;
+  /**
+   * Universal Submit Trigger
+   * Bypasses Chrome isolated-world restrictions on programmatic javascript: URL clicks
+   * by directly injecting script execution into the page's MAIN JavaScript context.
+   */
+  function triggerUniversalSubmit(loginButton) {
+    console.log("[RVCE Auto-Login] Triggering universal submission...");
+
+    // 1. Direct Script Injection in Page DOM (executes in page's MAIN context)
+    const scriptContent = `
+      (function() {
+        try {
+          if (typeof submitRequest === 'function') {
+            console.log('[RVCE Auto-Login] Invoked native submitRequest()');
+            submitRequest();
+            return;
+          }
+          const a = document.querySelector('a[href*="submitRequest"]');
+          if (a) {
+            const href = a.getAttribute('href') || '';
+            if (href.startsWith('javascript:')) {
+              eval(href.substring(11));
+              return;
+            }
+          }
+          const btn = document.getElementById('loginbutton') ||
+                      document.querySelector('button[type="submit"], input[type="submit"], [role="button"]');
+          if (btn) btn.click();
+        } catch(e) {
+          console.log('[RVCE Auto-Login] Native submit exception:', e);
+        }
+      })();
+    `;
+
     try {
-      btn.focus();
+      const scriptEl = document.createElement("script");
+      scriptEl.textContent = scriptContent;
+      (document.head || document.documentElement).appendChild(scriptEl);
+      scriptEl.remove();
+    } catch (e) {
+      console.log("[RVCE Auto-Login] DOM script injection notice:", e);
+    }
+
+    // 2. Background Service Worker MAIN world execution (Manifest V3 scripting API)
+    try {
+      if (chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({ action: "executeInMainWorld" }, (res) => {
+          console.log("[RVCE Auto-Login] Background main world execution ACK:", res);
+        });
+      }
     } catch (e) {}
 
-    // Dispatch standard click
-    btn.click();
-
-    // If button is inside an <a> tag (e.g. Sophos <a href="javascript:submitRequest()"><div id="loginbutton">...</div></a>)
-    const parentLink = btn.closest("a");
-    if (parentLink && parentLink !== btn) {
+    // 3. Fallback programmatic clicks & mouse event dispatches
+    if (loginButton) {
       try {
-        parentLink.click();
+        loginButton.focus();
+      } catch (e) {}
+
+      loginButton.click();
+
+      const parentLink = loginButton.closest("a");
+      if (parentLink && parentLink !== loginButton) {
+        try {
+          parentLink.click();
+        } catch (e) {}
+      }
+
+      try {
+        loginButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+        loginButton.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+        loginButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
       } catch (e) {}
     }
 
-    // If candidate has an inner clickable button
-    const innerBtn = btn.querySelector("#loginbutton, .button, [role='button']");
-    if (innerBtn && innerBtn !== btn) {
+    // 4. Form submit fallback
+    const userField = findUsernameField();
+    const form = (loginButton ? loginButton.closest("form") : null) || (userField ? userField.closest("form") : null);
+    if (form) {
       try {
-        innerBtn.click();
-      } catch (e) {}
+        form.requestSubmit();
+      } catch (e) {
+        try {
+          form.submit();
+        } catch (err) {}
+      }
     }
-
-    // Also dispatch full mouse events for frameworks listening to mousedown/mouseup
-    try {
-      btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-      btn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-      btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-    } catch (e) {}
   }
 
   function setInputValue(element, value) {
@@ -219,7 +267,6 @@
     const text = document.body ? document.body.innerText.toLowerCase() : "";
     const url = window.location.href.toLowerCase();
 
-    // If we are currently active on Sophos or Fortinet, we are not logged out
     if (isKeepalivePage()) return false;
 
     return (
@@ -271,22 +318,18 @@
   }
 
   function isLoginPage() {
-    // If already in active session or logout recovery, this is NOT a login page
     if (isKeepalivePage()) return false;
     if (isLogoutPage()) return false;
 
-    // Must have username and password fields
     const userField = findUsernameField();
     const passField = findPasswordField();
     if (!userField || !passField) return false;
 
-    // On Sophos, check if credentials container is hidden with 'loggedin'
     const credsContainer = document.getElementById("credentials");
     if (credsContainer && credsContainer.classList.contains("loggedin")) {
       return false;
     }
 
-    // Make sure page does not display active session confirmation
     const text = document.body ? document.body.innerText.toLowerCase() : "";
     if (text.includes("you are signed in") || text.includes("do not close this page")) {
       return false;
@@ -317,11 +360,13 @@
   // --- UI Components ---
   // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
   function injectTopBanner(text, backgroundColor = "#28a745", cursor = "pointer") {
-    let existing = document.getElementById("rvce-auto-banner");
-    if (existing) existing.remove();
+    let banner = document.getElementById("rvce-auto-banner");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "rvce-auto-banner";
+      document.body.prepend(banner);
+    }
 
-    const banner = document.createElement("div");
-    banner.id = "rvce-auto-banner";
     banner.textContent = text;
     Object.assign(banner.style, {
       position: "fixed",
@@ -343,8 +388,12 @@
       transition: "background-color 0.2s ease"
     });
 
-    document.body.prepend(banner);
     return banner;
+  }
+
+  function removeTopBanner() {
+    const banner = document.getElementById("rvce-auto-banner");
+    if (banner) banner.remove();
   }
 
   function injectKeepaliveBadge(remainingSeconds, onManualRefresh, gatewayName = "") {
@@ -410,6 +459,11 @@
     }
   }
 
+  function removeKeepaliveBadge() {
+    const badge = document.getElementById("rvce-keepalive-badge");
+    if (badge) badge.remove();
+  }
+
   // --- Perform Login Routine ---
   // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
   function performLogin(data, onSuccess, onFail) {
@@ -427,258 +481,258 @@
       setInputValue(passwordField, data.password);
       console.log("[RVCE Auto-Login] Credentials populated.");
 
-      if (loginButton) {
-        if (onSuccess) onSuccess();
-        setTimeout(() => {
-          triggerButtonClick(loginButton);
-          console.log("[RVCE Auto-Login] Sign In button activated:", loginButton);
-        }, 300);
-      } else {
-        // Fallback: If no explicit button located, try form submit
-        const form = usernameField.closest("form");
-        if (form) {
-          if (onSuccess) onSuccess();
-          setTimeout(() => {
-            console.log("[RVCE Auto-Login] Triggering form submit fallback.");
-            try {
-              form.requestSubmit();
-            } catch (e) {
-              form.submit();
-            }
-          }, 300);
-        } else {
-          if (onFail) onFail("Sign In button could not be located on the page.");
-        }
-      }
+      if (onSuccess) onSuccess();
+
+      // Short delay for DOM field binding, then trigger universal submission
+      setTimeout(() => {
+        triggerUniversalSubmit(loginButton);
+      }, 350);
     } else {
       if (onFail) onFail("Login input fields could not be found.");
     }
   }
 
-  // --- Main State Machine Controller ---
-  // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
-  function runStateMachine() {
-    // Clean up any lingering top banner from previous states if page is active
-    if (isKeepalivePage()) {
-      const oldBanner = document.getElementById("rvce-auto-banner");
-      if (oldBanner) oldBanner.remove();
-    }
+  // --- Reactive State Machine Handlers ---
+  let activeCountdownInterval = null;
+  let activeConnectingTimeout = null;
 
-    // STATE 4: LOGOUT RECOVERY
-    if (isLogoutPage()) {
-      console.log("[RVCE State Machine] State: LOGOUT_RECOVERY - Session logged out.");
+  function handleLogoutRecovery() {
+    console.log("[RVCE State Machine] Entering State: LOGOUT_RECOVERY");
+    removeKeepaliveBadge();
 
-      let attempts = 0;
-      const banner = injectTopBanner("🔄 Session logged out. Reconnecting to RVCE WiFi...", "#28a745", "pointer");
+    let attempts = 0;
+    const banner = injectTopBanner("🔄 Session logged out. Reconnecting to RVCE WiFi...", "#28a745", "pointer");
 
-      const endpoints = [
-        "http://1.1.1.1",
-        "http://connectivitycheck.gstatic.com/generate_204",
-        "http://1.0.0.1",
-        "http://www.msftconnecttest.com/redirect"
-      ];
+    const endpoints = [
+      "http://1.1.1.1",
+      "http://connectivitycheck.gstatic.com/generate_204",
+      "http://1.0.0.1",
+      "http://www.msftconnecttest.com/redirect"
+    ];
 
-      const attemptRecovery = () => {
-        attempts++;
-        console.log(`[RVCE State Machine] Recovery attempt #${attempts}. Cancelling hanging requests...`);
+    const attemptRecovery = () => {
+      attempts++;
+      console.log(`[RVCE State Machine] Recovery attempt #${attempts}. Cancelling hanging requests...`);
 
+      try {
+        window.stop();
+      } catch (e) {
+        console.log("[RVCE State Machine] window.stop failed:", e);
+      }
+
+      banner.textContent = attempts > 1
+        ? `🔄 Reconnecting to RVCE WiFi (Retrying #${attempts})... Click to force retry`
+        : "🔄 Session logged out. Reconnecting to RVCE WiFi...";
+
+      const targetUrl = endpoints[(attempts - 1) % endpoints.length];
+
+      setTimeout(() => {
         try {
-          window.stop();
+          window.location.replace(targetUrl);
         } catch (e) {
-          console.log("[RVCE State Machine] window.stop failed:", e);
+          window.location.href = targetUrl;
         }
+      }, 50);
+    };
 
-        banner.textContent = attempts > 1
-          ? `🔄 Reconnecting to RVCE WiFi (Retrying #${attempts})... Click to force retry`
-          : "🔄 Session logged out. Reconnecting to RVCE WiFi...";
-
-        const targetUrl = endpoints[(attempts - 1) % endpoints.length];
-
-        setTimeout(() => {
-          try {
-            window.location.replace(targetUrl);
-          } catch (e) {
-            window.location.href = targetUrl;
-          }
-        }, 50);
-      };
-
-      banner.addEventListener("click", attemptRecovery);
-      setTimeout(attemptRecovery, 400);
-
-      const watchdogTimer = setInterval(() => {
-        if (isLogoutPage()) {
-          console.log("[RVCE State Machine] Stuck on logout page. Retrying recovery...");
-          attemptRecovery();
-        } else {
-          clearInterval(watchdogTimer);
-        }
-      }, 3000);
-
-      return;
-    }
-
-    // STATE 2: SESSION ACTIVE (Keepalive Page / Sophos Logged-in / Fortinet Keepalive)
-    // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
-    if (isKeepalivePage()) {
-      console.log("[RVCE State Machine] State: SESSION_ACTIVE");
-
-      // Clean up login banner if still present
-      const loginBanner = document.getElementById("rvce-auto-banner");
-      if (loginBanner) loginBanner.remove();
-
-      // Mark session as armed across page reloads and storage
-      sessionStorage.setItem("rvce_session_armed", "true");
-      chrome.storage.local.set({ sessionArmed: true, lastKeepalive: Date.now() });
-
-      // Detect portal type
-      const isSophos = window.location.href.includes("httpclient.html") || !!document.getElementById("donotclosepage");
-      const gatewayLabel = isSophos ? "Sophos" : "Fortinet";
-
-      // On Sophos: Neutralize window.onbeforeunload logout beacon to prevent accidental session termination
-      if (isSophos) {
-        try {
-          window.onbeforeunload = null;
-          console.log("[RVCE Auto-Login] Neutralized Sophos onbeforeunload logout hook.");
-        } catch (e) {}
-      }
-
-      // Load user configured refresh interval (default 5 min)
-      chrome.storage.local.get(["refreshInterval", "username"], (result) => {
-        const intervalMinutes = (result.refreshInterval && result.refreshInterval >= 1) ? result.refreshInterval : 5;
-        let remainingSeconds = intervalMinutes * 60;
-
-        const performRefresh = () => {
-          if (isSophos) {
-            // Sophos Keepalive: Ping live keepalive endpoint directly to refresh server lease
-            console.log("[RVCE Auto-Login] Refreshing Sophos live session ping...");
-            const username = result.username || document.getElementById("username")?.value || "";
-            const pingUrl = `/live?mode=192&username=${encodeURIComponent(username.toLowerCase())}&a=${Date.now()}`;
-            fetch(pingUrl, { method: "GET" })
-              .then((res) => res.text())
-              .then((respText) => {
-                console.log("[RVCE Auto-Login] Sophos keepalive ACK received:", respText.substring(0, 100));
-                remainingSeconds = intervalMinutes * 60;
-                injectKeepaliveBadge(remainingSeconds, performRefresh, gatewayLabel);
-              })
-              .catch((err) => {
-                console.log("[RVCE Auto-Login] Sophos ping notice:", err);
-                remainingSeconds = intervalMinutes * 60;
-              });
-          } else {
-            // Fortinet Keepalive: Standard page reload resets lease
-            console.log("[RVCE Auto-Login] Reloading Fortinet keepalive page...");
-            window.location.reload();
-          }
-        };
-
-        injectKeepaliveBadge(remainingSeconds, performRefresh, gatewayLabel);
-
-        const countdownInterval = setInterval(() => {
-          remainingSeconds--;
-          if (remainingSeconds <= 0) {
-            remainingSeconds = intervalMinutes * 60;
-            performRefresh();
-          } else {
-            injectKeepaliveBadge(remainingSeconds, performRefresh, gatewayLabel);
-          }
-        }, 1000);
-
-        // Continuous Session Watchdog:
-        // Detects if the session drops on the client (e.g., Sophos flips back to 'loggedout')
-        // Automatically transitions to State 3 without requiring user intervention!
-        const sessionDropWatcher = setInterval(() => {
-          if (!isKeepalivePage()) {
-            console.log("[RVCE State Machine] Session drop detected! Transitioning to Auto-Reconnect...");
-            clearInterval(countdownInterval);
-            clearInterval(sessionDropWatcher);
-            const badge = document.getElementById("rvce-keepalive-badge");
-            if (badge) badge.remove();
-            runStateMachine();
-          }
-        }, 2000);
-      });
-
-      return;
-    }
-
-    // STATE 1 & STATE 3: LOGIN PAGE
-    // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
-    if (isLoginPage()) {
-      // Check for authentication failure errors
-      if (hasAuthError()) {
-        console.log("[RVCE State Machine] Authentication failure detected. Disarming auto-login to prevent loop.");
-        sessionStorage.removeItem("rvce_session_armed");
-        chrome.storage.local.set({ sessionArmed: false });
-        injectTopBanner("❌ Authentication Failed: Please check your credentials in the extension popup.", "#dc2626", "default");
-        return;
-      }
-
-      // Check if session is armed (from previous Auto-Continue or keepalive session)
-      chrome.storage.local.get(["username", "password", "sessionArmed", "lastKeepalive"], (storageData) => {
-        const sessionArmedLocal = sessionStorage.getItem("rvce_session_armed") === "true";
-        const storageArmed = storageData.sessionArmed === true && (Date.now() - (storageData.lastKeepalive || 0) < 12 * 3600 * 1000);
-        const isArmed = sessionArmedLocal || storageArmed;
-
-        // Always show the green "Auto-Continue" button
-        const banner = injectTopBanner("Auto-Continue", "#28a745", "pointer");
-
-        banner.addEventListener("mouseenter", () => {
-          banner.style.backgroundColor = "#218838";
-        });
-        banner.addEventListener("mouseleave", () => {
-          banner.style.backgroundColor = "#28a745";
-        });
-
-        const executeLogin = () => {
-          banner.textContent = "Connecting...";
-          banner.style.backgroundColor = "#16a34a";
-
-          // Arm the session
-          sessionStorage.setItem("rvce_session_armed", "true");
-          chrome.storage.local.set({ sessionArmed: true, lastKeepalive: Date.now() });
-
-          performLogin(
-            storageData,
-            () => {
-              banner.textContent = "Connecting to RVCE WiFi...";
-            },
-            (errMessage) => {
-              alert(errMessage);
-              banner.textContent = "Auto-Continue";
-              banner.style.backgroundColor = "#28a745";
-              sessionStorage.removeItem("rvce_session_armed");
-              chrome.storage.local.set({ sessionArmed: false });
-            }
-          );
-        };
-
-        banner.addEventListener("click", executeLogin);
-
-        if (isArmed) {
-          // STATE 3: AUTO_RECONNECT
-          // Green button appears, then automatically presses after 700ms to allow DOM to settle
-          console.log("[RVCE State Machine] State: AUTO_RECONNECT (Session armed). Auto-pressing Auto-Continue button in 700ms.");
-          setTimeout(() => {
-            executeLogin();
-          }, 700);
-        } else {
-          // STATE 1: COLD_START_LOGIN
-          console.log("[RVCE State Machine] State: COLD_START_LOGIN. Waiting for single manual user click.");
-        }
-      });
-
-      return;
-    }
-
-    console.log("[RVCE State Machine] Page is neither active session, login, nor logout.");
+    banner.addEventListener("click", attemptRecovery);
+    setTimeout(attemptRecovery, 400);
   }
 
-  // Run on DOM ready
-  // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
+  function handleSessionActive() {
+    console.log("[RVCE State Machine] Entering State: SESSION_ACTIVE");
+
+    // Clean up login banner & timers
+    removeTopBanner();
+    if (activeConnectingTimeout) {
+      clearTimeout(activeConnectingTimeout);
+      activeConnectingTimeout = null;
+    }
+
+    sessionStorage.setItem("rvce_session_armed", "true");
+    chrome.storage.local.set({ sessionArmed: true, lastKeepalive: Date.now() });
+
+    const isSophos = window.location.href.includes("httpclient.html") || !!document.getElementById("donotclosepage");
+    const gatewayLabel = isSophos ? "Sophos" : "Fortinet";
+
+    // Neutralize Sophos onbeforeunload logout beacon
+    if (isSophos) {
+      try {
+        window.onbeforeunload = null;
+        const script = document.createElement("script");
+        script.textContent = "window.onbeforeunload = null;";
+        (document.head || document.documentElement).appendChild(script);
+        script.remove();
+        console.log("[RVCE Auto-Login] Neutralized Sophos onbeforeunload.");
+      } catch (e) {}
+    }
+
+    chrome.storage.local.get(["refreshInterval", "username"], (result) => {
+      const intervalMinutes = (result.refreshInterval && result.refreshInterval >= 1) ? result.refreshInterval : 5;
+      let remainingSeconds = intervalMinutes * 60;
+
+      const performRefresh = () => {
+        if (isSophos) {
+          console.log("[RVCE Auto-Login] Refreshing Sophos live session ping...");
+          const username = result.username || document.getElementById("username")?.value || "";
+          const pingUrl = `/live?mode=192&username=${encodeURIComponent(username.toLowerCase())}&a=${Date.now()}`;
+          fetch(pingUrl, { method: "GET" })
+            .then((res) => res.text())
+            .then((respText) => {
+              console.log("[RVCE Auto-Login] Sophos keepalive response:", respText.substring(0, 100));
+              remainingSeconds = intervalMinutes * 60;
+              injectKeepaliveBadge(remainingSeconds, performRefresh, gatewayLabel);
+            })
+            .catch((err) => {
+              console.log("[RVCE Auto-Login] Sophos ping notice:", err);
+              remainingSeconds = intervalMinutes * 60;
+            });
+        } else {
+          console.log("[RVCE Auto-Login] Reloading Fortinet keepalive page...");
+          window.location.reload();
+        }
+      };
+
+      injectKeepaliveBadge(remainingSeconds, performRefresh, gatewayLabel);
+
+      if (activeCountdownInterval) clearInterval(activeCountdownInterval);
+      activeCountdownInterval = setInterval(() => {
+        remainingSeconds--;
+        if (remainingSeconds <= 0) {
+          remainingSeconds = intervalMinutes * 60;
+          performRefresh();
+        } else {
+          injectKeepaliveBadge(remainingSeconds, performRefresh, gatewayLabel);
+        }
+      }, 1000);
+    });
+  }
+
+  function handleLoginPage() {
+    console.log("[RVCE State Machine] Entering State: LOGIN_PAGE");
+    removeKeepaliveBadge();
+    if (activeCountdownInterval) {
+      clearInterval(activeCountdownInterval);
+      activeCountdownInterval = null;
+    }
+
+    if (hasAuthError()) {
+      console.log("[RVCE State Machine] Auth failure detected. Disarming auto-login.");
+      sessionStorage.removeItem("rvce_session_armed");
+      chrome.storage.local.set({ sessionArmed: false });
+      injectTopBanner("❌ Authentication Failed: Please check your credentials in the extension popup.", "#dc2626", "default");
+      return;
+    }
+
+    chrome.storage.local.get(["username", "password", "sessionArmed", "lastKeepalive"], (storageData) => {
+      const sessionArmedLocal = sessionStorage.getItem("rvce_session_armed") === "true";
+      const storageArmed = storageData.sessionArmed === true && (Date.now() - (storageData.lastKeepalive || 0) < 12 * 3600 * 1000);
+      const isArmed = sessionArmedLocal || storageArmed;
+
+      const banner = injectTopBanner("Auto-Continue", "#28a745", "pointer");
+
+      banner.addEventListener("mouseenter", () => {
+        if (banner.textContent === "Auto-Continue") banner.style.backgroundColor = "#218838";
+      });
+      banner.addEventListener("mouseleave", () => {
+        if (banner.textContent === "Auto-Continue") banner.style.backgroundColor = "#28a745";
+      });
+
+      const executeLogin = () => {
+        banner.textContent = "Connecting to RVCE WiFi...";
+        banner.style.backgroundColor = "#16a34a";
+
+        sessionStorage.setItem("rvce_session_armed", "true");
+        chrome.storage.local.set({ sessionArmed: true, lastKeepalive: Date.now() });
+
+        // Safeguard watchdog: If page remains on login after 8 seconds, provide instant retry
+        if (activeConnectingTimeout) clearTimeout(activeConnectingTimeout);
+        activeConnectingTimeout = setTimeout(() => {
+          if (isLoginPage()) {
+            console.log("[RVCE Auto-Login] Connection taking longer than expected. Enabling retry.");
+            banner.textContent = "⚠️ Still Connecting... Click to Retry";
+            banner.style.backgroundColor = "#d97706";
+          }
+        }, 8000);
+
+        performLogin(
+          storageData,
+          () => {
+            banner.textContent = "Connecting to RVCE WiFi...";
+          },
+          (errMessage) => {
+            alert(errMessage);
+            banner.textContent = "Auto-Continue";
+            banner.style.backgroundColor = "#28a745";
+            sessionStorage.removeItem("rvce_session_armed");
+            chrome.storage.local.set({ sessionArmed: false });
+          }
+        );
+      };
+
+      banner.addEventListener("click", executeLogin);
+
+      if (isArmed) {
+        console.log("[RVCE State Machine] State: AUTO_RECONNECT (Session armed). Auto-pressing Auto-Continue in 600ms.");
+        setTimeout(executeLogin, 600);
+      } else {
+        console.log("[RVCE State Machine] State: COLD_START_LOGIN. Waiting for single user click.");
+      }
+    });
+  }
+
+  // --- Live Reactive State Machine Controller ---
+  let currentState = null; // "LOGIN", "ACTIVE", "LOGOUT"
+  let debouncedStateCheck = null;
+
+  function runReactiveStateMachine() {
+    if (isKeepalivePage()) {
+      if (currentState !== "ACTIVE") {
+        currentState = "ACTIVE";
+        handleSessionActive();
+      }
+    } else if (isLogoutPage()) {
+      if (currentState !== "LOGOUT") {
+        currentState = "LOGOUT";
+        handleLogoutRecovery();
+      }
+    } else if (isLoginPage()) {
+      if (currentState !== "LOGIN") {
+        currentState = "LOGIN";
+        handleLoginPage();
+      }
+    }
+  }
+
+  function scheduleStateCheck() {
+    if (debouncedStateCheck) clearTimeout(debouncedStateCheck);
+    debouncedStateCheck = setTimeout(runReactiveStateMachine, 120);
+  }
+
+  // Observe DOM mutations to reactively catch AJAX state transitions (e.g. Sophos single-page login)
+  const domObserver = new MutationObserver(() => {
+    scheduleStateCheck();
+  });
+
+  function startEngine() {
+    runReactiveStateMachine();
+
+    if (document.body) {
+      domObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "style"]
+      });
+    }
+
+    // Safety polling interval every 1.5s
+    setInterval(runReactiveStateMachine, 1500);
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", runStateMachine);
+    document.addEventListener("DOMContentLoaded", startEngine);
   } else {
-    runStateMachine();
+    startEngine();
   }
 })();
