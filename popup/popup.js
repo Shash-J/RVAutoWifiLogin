@@ -1,4 +1,4 @@
-// RVCE WiFi Auto-Login Popup Controller
+// RVCE WiFi Auto-Login Popup Controller (v2.3.0)
 // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -8,12 +8,15 @@ document.addEventListener("DOMContentLoaded", function () {
         extVersionEl.textContent = `v${chrome.runtime.getManifest().version}`;
     }
 
-    const DEFAULT_PORTAL_IP = "172.16.0.2:1003";
+    const DEFAULT_PORTAL_IP = "172.16.0.4:8090"; // RVCE Sophos Portal
+    const KNOWN_PORTAL_IPS = ["172.16.0.4:8090", "172.16.0.2:1003", "172.16.0.4", "172.16.0.2"];
 
     const usernameInput = document.getElementById("username");
     const passwordInput = document.getElementById("password");
     const portalIpInput = document.getElementById("portalIp");
     const resetIpButton = document.getElementById("resetIp");
+    const presetSophosBtn = document.getElementById("presetSophos");
+    const presetFortinetBtn = document.getElementById("presetFortinet");
     const refreshIntervalInput = document.getElementById("refreshInterval");
     const saveButton = document.getElementById("save");
     const clearButton = document.getElementById("clear");
@@ -45,6 +48,13 @@ document.addEventListener("DOMContentLoaded", function () {
             .replace(/\/+$/, "");
     }
 
+    function updatePresetHighlight(currentHost) {
+        if (presetSophosBtn && presetFortinetBtn) {
+            presetSophosBtn.classList.toggle("active", currentHost === "172.16.0.4:8090");
+            presetFortinetBtn.classList.toggle("active", currentHost === "172.16.0.2:1003");
+        }
+    }
+
     // Load saved settings
     chrome.storage.local.get(["username", "password", "refreshInterval", "portalIp"], function (data) {
         if (data.username || data.password) {
@@ -60,13 +70,36 @@ document.addEventListener("DOMContentLoaded", function () {
 
         savedPortalIp = data.portalIp ? cleanHost(data.portalIp) : DEFAULT_PORTAL_IP;
         portalIpInput.value = savedPortalIp;
+        updatePresetHighlight(savedPortalIp);
         refreshIntervalInput.value = data.refreshInterval !== undefined ? data.refreshInterval : 5;
     });
+
+    // Preset button handlers
+    if (presetSophosBtn) {
+        presetSophosBtn.addEventListener("click", function () {
+            portalIpInput.value = "172.16.0.4:8090";
+            updatePresetHighlight("172.16.0.4:8090");
+            showStatus("Selected Sophos (172.16.0.4:8090). Click Save to apply.");
+        });
+    }
+
+    if (presetFortinetBtn) {
+        presetFortinetBtn.addEventListener("click", function () {
+            portalIpInput.value = "172.16.0.2:1003";
+            updatePresetHighlight("172.16.0.2:1003");
+            showStatus("Selected Fortinet (172.16.0.2:1003). Click Save to apply.");
+        });
+    }
 
     // Reset IP to default
     resetIpButton.addEventListener("click", function () {
         portalIpInput.value = DEFAULT_PORTAL_IP;
-        showStatus("Portal IP reset to standard RVCE default: " + DEFAULT_PORTAL_IP);
+        updatePresetHighlight(DEFAULT_PORTAL_IP);
+        showStatus("Portal IP reset to standard RVCE Sophos default: " + DEFAULT_PORTAL_IP);
+    });
+
+    portalIpInput.addEventListener("input", function () {
+        updatePresetHighlight(cleanHost(portalIpInput.value));
     });
 
     // Perform the actual save
@@ -82,13 +115,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
         savedPortalIp = portalIpToSave;
         portalIpInput.value = portalIpToSave;
+        updatePresetHighlight(portalIpToSave);
 
         chrome.storage.local.set({ username, password, refreshInterval, portalIp: portalIpToSave }, function () {
             showStatus(`Settings saved! Portal: ${portalIpToSave} • Keepalive: ${refreshInterval}m`);
             saveButton.textContent = "Update Settings";
 
-            // Request permission dynamically for custom host if not default
-            if (portalIpToSave !== DEFAULT_PORTAL_IP && chrome.permissions && chrome.permissions.request) {
+            // Request permission dynamically for custom host if not built-in
+            if (!KNOWN_PORTAL_IPS.includes(portalIpToSave) && chrome.permissions && chrome.permissions.request) {
                 chrome.permissions.request(
                     {
                         origins: [`http://${portalIpToSave}/*`, `https://${portalIpToSave}/*`]
@@ -117,9 +151,9 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        // Check if user is attempting to change from standard default IP
-        if (currentEnteredIp !== DEFAULT_PORTAL_IP && currentEnteredIp !== savedPortalIp) {
-            modalBodyText.innerHTML = `You are modifying the Portal Gateway to <strong>${currentEnteredIp}</strong>.<br><br>⚠️ The standard RVCE campus gateway is <strong>${DEFAULT_PORTAL_IP}</strong>. Only proceed if your specific campus block uses this custom address.`;
+        // Only warn if user changes to an unknown/unrecognized third-party IP
+        if (!KNOWN_PORTAL_IPS.includes(currentEnteredIp) && currentEnteredIp !== savedPortalIp) {
+            modalBodyText.innerHTML = `You are modifying the Portal Gateway to <strong>${currentEnteredIp}</strong>.<br><br>⚠️ The standard RVCE campus portals are <strong>172.16.0.4:8090</strong> (Sophos) and <strong>172.16.0.2:1003</strong> (Fortinet). Only proceed if your specific campus block uses this custom address.`;
             ipWarningModal.classList.remove("hidden");
             return;
         }
@@ -137,6 +171,7 @@ document.addEventListener("DOMContentLoaded", function () {
     cancelIpChangeBtn.addEventListener("click", function () {
         ipWarningModal.classList.add("hidden");
         portalIpInput.value = savedPortalIp;
+        updatePresetHighlight(savedPortalIp);
         showStatus("Retained previous Portal Gateway IP: " + savedPortalIp);
     });
 
@@ -148,6 +183,7 @@ document.addEventListener("DOMContentLoaded", function () {
             passwordInput.value = "";
             portalIpInput.value = DEFAULT_PORTAL_IP;
             savedPortalIp = DEFAULT_PORTAL_IP;
+            updatePresetHighlight(DEFAULT_PORTAL_IP);
             refreshIntervalInput.value = 5;
             saveButton.textContent = "Save Settings";
             showStatus("Saved credentials and custom portal settings cleared.");
@@ -158,6 +194,3 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 });
-
-
-  

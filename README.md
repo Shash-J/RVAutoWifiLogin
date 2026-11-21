@@ -1,6 +1,6 @@
-# RVCE WiFi Auto-Login Engine (v2.2.0)
+# RVCE WiFi Auto-Login Engine (v2.3.0)
 
-An open-source Chrome Extension designed for RV College of Engineering (RVCE) students and faculty. It automates authentication on the campus Fortinet captive portal (`https://172.16.0.2:1003`), runs a background keepalive refresh loop, and autonomously reconnects when sessions expire.
+An open-source Chrome Extension designed for RV College of Engineering (RVCE) students and faculty. It automates authentication on both the new campus **Sophos Cyberoam Captive Portal** (`https://172.16.0.4:8090/httpclient.html`) and the classic **Fortinet Gateway** (`https://172.16.0.2:1003`), runs an autonomous background keepalive refresh loop, and reconnects seamlessly when sessions expire.
 
 ---
 
@@ -8,13 +8,13 @@ An open-source Chrome Extension designed for RV College of Engineering (RVCE) st
 
 > **Note**: Proven 100% reliability over 3+ years based on practical daily campus usage experience.
 
-At RVCE, campus Wi-Fi sessions expire periodically (typically every ~37 minutes via Fortinet's lease cycle), requiring users to repeatedly re-enter credentials or manually click through portal tabs. 
+At RVCE, campus Wi-Fi sessions expire periodically, requiring students to repeatedly re-enter credentials or struggle with captive portal popups. Recently, the college upgraded its network infrastructure to **Sophos Firewall** (`172.16.0.4:8090`), which uses dynamic AJAX state transitions, custom DOM structures (`<div id="loginbutton">`), and an active session monitor (`httpclient.html`).
 
-**The RVCE Auto-Login Engine** solves this completely:
+**The RVCE Auto-Login Engine** solves this completely across all campus gateways:
 1. When you first open your laptop and connect to Wi-Fi, you only need to click **"Auto-Continue"** once.
-2. The engine keeps your session active by automatically refreshing the keepalive page every **5 minutes** (configurable), continually resetting Fortinet's countdown timer.
+2. The engine keeps your session active by automatically maintaining the keepalive cycle (refreshing Fortinet leases and pinging Sophos keepalive beacons).
 3. If the network blips, times out, or redirects back to the login page, the engine **autonomously logs you back in with zero clicks required**.
-4. If a logout confirmation page appears, it immediately redirects and restores your session.
+4. If a logout confirmation page appears, it immediately cancels hanging requests and restores your connection.
 
 ---
 
@@ -31,69 +31,36 @@ The extension operates on an autonomous 4-state finite state machine (FSM):
 | State | Trigger & Conditions | Actions & Behavior | Next Transition |
 | :--- | :--- | :--- | :--- |
 | **1. Cold Start Login** | First visit to login portal after opening laptop (`sessionArmed = false`). | Injects the top green banner: **`Auto-Continue`**. Waits for user click. | On click $\rightarrow$ Arms session, fills credentials, clicks Sign In $\rightarrow$ **State 2**. |
-| **2. Session Active** | Browser lands on `/keepalive` with active session. | Injects a floating status pill (`🛡️ RVCE Keepalive Active • Refresh in 4:59`). Runs countdown. | When timer expires $\rightarrow$ reloads page to reset Fortinet lease $\rightarrow$ **State 2** (or **State 3** if dropped). |
-| **3. Auto-Reconnect** | Page lands on portal login while `sessionArmed = true`. | Displays the green **`Auto-Continue`** banner, then automatically presses it after 700ms (zero-click). | On success $\rightarrow$ **State 2**. On auth failure $\rightarrow$ Disarms to prevent loops. |
+| **2. Session Active** | Browser lands on active session (`/keepalive` or Sophos `httpclient.html` with `"You are signed in"`). | Injects floating status pill (`🛡️ RVCE Keepalive Active • Refresh in 4:59`). Pings Sophos `/live` beacon or reloads Fortinet `/keepalive`. Continuously monitors session health. | Timer countdown maintains connection $\rightarrow$ **State 2**. If session drops $\rightarrow$ **State 3**. |
+| **3. Auto-Reconnect** | Page lands on portal login while `sessionArmed = true`. | Displays the green **`Auto-Continue`** banner, then automatically triggers login after 700ms (zero-click). | On success $\rightarrow$ **State 2**. On auth failure $\rightarrow$ Disarms to prevent loops. |
 | **4. Logout Recovery** | Page displays `"successfully log out"` or `/logout`. | Detects session termination. Displays redirection banner, cancels any hanging requests via `window.stop()`, and runs an automated watchdog retry loop every 3s to restore the login page. | Lands on portal login $\rightarrow$ **State 3** (Auto-Reconnect). |
 
 ---
 
 ## ✨ Features
 
-- **One-Click Initial Setup**: Enter your username and WiFi password once in the extension popup.
-- **Customizable Portal Gateway IP**: Target any campus block or custom gateway (default: `172.16.0.2:1003`) with interactive safety confirmation dialogs to prevent accidental misconfigurations.
-- **Configurable Keepalive Refresh**: Default refresh interval is set to **5 minutes** (recommended to comfortably beat Fortinet's ~37 min lease cycle). You can adjust this to any interval between 1 and 30 minutes in the popup.
-- **Zero-Click Autonomous Reconnection**: Once armed during your session, any network timeout or dropped session is automatically recovered without disturbing your workflow. The green button appears and is automatically pressed.
-- **Visual Feedback**:
-  - **Top Banner**: Clear visual indication during connection and reconnection.
-  - **Keepalive Pill**: Shows exact countdown until next refresh, with a quick `[↻ Refresh]` button for instant manual refresh.
-- **Auth Error Safeguard**: Disarms automatically if an incorrect password error is detected, avoiding infinite submit loops.
+- **Dual-Gateway Universal Support**:
+  - **Sophos Cyberoam / Sophos Firewall** (`172.16.0.4:8090` / `httpclient.html`): Handles dynamic DOM buttons (`#loginbutton`), AJAX login requests, and active session monitoring.
+  - **Fortinet FortiGate** (`172.16.0.2:1003` / `/keepalive`): Classic campus captive portal with automatic lease renewal.
+- **Universal Sign-In Button Detection**:
+  - Multi-tier detection engine supporting `div.button`, `a[href*="submitRequest"]`, `<button>`, `<input type="submit">`, and form submit fallbacks.
+  - Safety filter strictly prevents accidental clicks on "Sign out" / "Logout" buttons.
+- **Customizable Portal Gateway IP with Presets**:
+  - One-click preset switching between **Sophos (`172.16.0.4:8090`)** and **Fortinet (`172.16.0.2:1003`)**, with support for custom campus AP gateways.
+- **Configurable Keepalive Refresh**:
+  - Default refresh interval is set to **5 minutes** (adjustable between 1 and 30 minutes in the popup).
+  - Sophos: Pings server `/live?mode=192` beacon without disruptive full-page reloads and neutralizes destructive `onbeforeunload` logout beacons.
+  - Fortinet: Automatically reloads `/keepalive` to reset the Fortinet countdown timer.
+- **Continuous Session Drop Watchdog**:
+  - Live background watcher detects when a session expires on the server and immediately triggers zero-click re-authentication.
+- **Stuck Logout Recovery**:
+  - Active `window.stop()` cancellation and multi-endpoint watchdog retry loop (`http://1.1.1.1`, `generate_204`).
+- **100% Local & Secure**:
+  - Credentials remain strictly on your local browser machine via `chrome.storage.local`.
 
 ---
 
-## 🚀 Installation Guide
-
-### Option 1: Microsoft Edge Add-ons Store *(Official Store • In Review)*
-- **Store ID**: `9RDCKF4N78VR`
-- Submitted and currently in certification review. Once published, Edge users on campus can install with a single 1-click **"Get"** button!
-
-### Option 2: Direct Install (Google Chrome, Brave, Edge, Opera)
-1. Download or clone this repository:
-   ```bash
-   git clone https://github.com/Shash-J/RVAutoWifiLogin.git
-   ```
-   *(or click the green **Code** $\rightarrow$ **Download ZIP** button above and extract the folder)*.
-2. Open your browser and navigate to:
-   - Chrome: `chrome://extensions/`
-   - Edge: `edge://extensions/`
-3. Toggle **Developer mode** on (top-right switch).
-4. Click **Load unpacked** (top-left button).
-5. Select the extracted `RVAutoWifiLogin` directory.
-
----
-
-## 🛠️ How to Use
-
-1. Click the **RVCE WiFi Auto-Login** icon in your browser toolbar.
-2. Enter your campus Wi-Fi credentials:
-   - **Username**: Your campus Wi-Fi username
-   - **Password**: Your campus Wi-Fi password
-   - **Keepalive Refresh Interval**: `5` minutes (default)
-3. Click **Save Settings**.
-4. Connect to the RVCE Wi-Fi network.
-5. When the captive portal opens (`https://172.16.0.2:1003`), click the green **Auto-Continue** bar at the top once.
-6. Keep the keepalive tab open (or pin it). Enjoy uninterrupted internet throughout your day!
-
----
-
-## 🔒 Security & Privacy Notice
-
-- **100% Local Storage**: All credentials and settings are saved exclusively inside your local browser's `chrome.storage.local`.
-- **Zero Remote Transmission**: No data, credentials, or telemetry ever leave your machine.
-- **Scoped Permissions**: The extension only runs on the official RVCE portal domain (`*://172.16.0.2:1003/*`).
-
----
-
-## 📂 Project Structure
+## 🛠️ Project Structure
 
 ```
 RVAutoWifiLogin/
@@ -116,7 +83,8 @@ RVAutoWifiLogin/
 
 | Version | Date | Key Highlights |
 | :--- | :--- | :--- |
-| **v2.2.0** | Current | • Added customizable Portal Gateway IP/Host setting with instant "Reset Default" shortcut.<br>• Added interactive safety confirmation popup modal warning users before changing away from the campus standard `172.16.0.2:1003`.<br>• Implemented dynamic runtime content script injection via Manifest V3 `chrome.scripting` API.<br>• Clean modern modal styling with responsive popup UI controls. |
+| **v2.3.0** | Current | • **Sophos Captive Portal Support**: Complete integration for RVCE's new gateway `https://172.16.0.4:8090/httpclient.html`.<br>• **Universal Sign-In Button Recognition**: Multi-tier algorithm recognising `<div id="loginbutton">`, `a[href*="submitRequest"]`, `<button>`, `<input type="submit">`, and form fallbacks while strictly ignoring "Sign out" buttons.<br>• **Sophos Keepalive & Session Watchdog**: Native `/live` beacon pinging, `onbeforeunload` logout neutralization, and autonomous reconnect when sessions drop.<br>• **Dual Gateway Presets**: Instant 1-click preset switching in popup between Sophos (`172.16.0.4:8090`) and Fortinet (`172.16.0.2:1003`). |
+| **v2.2.0** | Prev | • Added customizable Portal Gateway IP/Host setting with instant "Reset Default" shortcut.<br>• Added interactive safety confirmation popup modal warning users before changing away from campus standards.<br>• Implemented dynamic runtime content script injection via Manifest V3 `chrome.scripting` API.<br>• Clean modern modal styling with responsive popup UI controls. |
 | **v2.1.0** | Prev | • Added State 4 stuck-request cancellation using `window.stop()`.<br>• 3-second watchdog retry loop with multi-endpoint captive portal rotation (`http://1.1.1.1`, Android `generate_204`, Windows `msftconnecttest`).<br>• Cleaned extension logging (replaced `console.warn` with `console.log` to prevent Chrome Extensions error page flags).<br>• Added dynamic version badge in popup header synced with `manifest.json`. |
 | **v2.0.0** | Prev | • Implemented autonomous 4-state engine (Cold Start, Session Active, Auto-Reconnect, Logout Recovery).<br>• Added configurable keepalive timer (1–30 min, default 5 min).<br>• Purged all hardcoded personal credentials for safe public open-source distribution.<br>• Standardized terminology to strictly "Username". |
 | **v1.0.0** | Initial | • Basic single-click credentials autofill banner. |
@@ -126,4 +94,3 @@ RVAutoWifiLogin/
 ## 🤝 Contributing
 
 Contributions, feature suggestions, and bug reports from fellow RVCE students are welcome! Feel free to open an issue or submit a pull request.
-

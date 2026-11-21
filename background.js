@@ -1,7 +1,8 @@
-// RVCE WiFi Auto-Login Service Worker
+// RVCE WiFi Auto-Login Service Worker (v2.3.0)
 // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
 
-const DEFAULT_PORTAL_IP = "172.16.0.2:1003";
+const DEFAULT_PORTAL_IP = "172.16.0.4:8090"; // New RVCE Sophos Gateway
+const BUILTIN_PORTAL_IPS = ["172.16.0.4:8090", "172.16.0.2:1003", "172.16.0.4", "172.16.0.2"];
 const SCRIPT_ID = "rvce-dynamic-portal-script";
 
 async function syncDynamicContentScript(portalIp) {
@@ -19,8 +20,8 @@ async function syncDynamicContentScript(portalIp) {
 
     const cleanHost = (portalIp || "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 
-    // Only register dynamic script if it is customized and different from the default manifest match
-    if (cleanHost && cleanHost !== DEFAULT_PORTAL_IP) {
+    // Only register dynamic script if it is customized and not already covered by manifest default matches
+    if (cleanHost && !BUILTIN_PORTAL_IPS.includes(cleanHost)) {
         try {
             await chrome.scripting.registerContentScripts([
                 {
@@ -47,7 +48,10 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.get(["refreshInterval", "portalIp"], (result) => {
         const updates = {};
         if (!result.refreshInterval) updates.refreshInterval = 5;
-        if (!result.portalIp) updates.portalIp = DEFAULT_PORTAL_IP;
+        // If unconfigured or still pointing to legacy default, update to new Sophos gateway
+        if (!result.portalIp || result.portalIp === "172.16.0.2:1003") {
+            updates.portalIp = DEFAULT_PORTAL_IP;
+        }
         if (Object.keys(updates).length > 0) {
             chrome.storage.local.set(updates);
         }
@@ -68,4 +72,3 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     return true;
 });
-

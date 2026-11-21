@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "RVCE WiFi Auto-Login",
-  "version": "2.2.0",
-  "description": "Autonomous State-Machine Auto-Login and Session Refresh Engine for RVCE WiFi",
+  "version": "2.3.0",
+  "description": "Autonomous State-Machine Auto-Login and Session Refresh Engine for RVCE WiFi (Sophos & Fortinet)",
   "permissions": ["storage", "scripting"],
   "optional_host_permissions": ["*://*/*"],
   "icons": {
@@ -26,6 +26,10 @@
   "content_scripts": [
     {
       "matches": [
+        "https://172.16.0.4:8090/*",
+        "http://172.16.0.4:8090/*",
+        "https://172.16.0.4/*",
+        "http://172.16.0.4/*",
         "https://172.16.0.2:1003/*",
         "http://172.16.0.2:1003/*"
       ],
