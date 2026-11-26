@@ -8,7 +8,7 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            width: 310px;
+            width: 320px;
             padding: 16px;
             margin: 0;
             background-color: #f8fafc;
@@ -62,22 +62,24 @@
         }
         .presets-row {
             display: flex;
-            gap: 6px;
-            margin-top: 5px;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 6px;
             margin-bottom: 4px;
         }
         .btn-preset {
-            flex: 1;
-            padding: 4px 6px;
+            flex: 1 1 auto;
+            padding: 5px 6px;
             background: #f1f5f9;
             border: 1px solid #cbd5e1;
             border-radius: 4px;
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             font-weight: 600;
             color: #475569;
             cursor: pointer;
             transition: all 0.15s ease;
             text-align: center;
+            white-space: nowrap;
         }
         .btn-preset:hover {
             background: #e2e8f0;
@@ -218,7 +220,7 @@
 <body>
     <h2>
         <span>📶 RVCE Auto-Login</span>
-        <span id="extVersion" class="badge-version">v2.3.2</span>
+        <span id="extVersion" class="badge-version">v2.4.0</span>
     </h2>
     <div class="subtitle">Autonomous Keepalive & Auto-Connect Engine</div>
     <div id="status">Loading configuration...</div>
@@ -235,15 +237,16 @@
 
     <div class="form-group">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <label for="portalIp" style="margin-bottom: 0;">Portal Gateway IP / Address</label>
-            <button type="button" id="resetIp" class="btn-text" title="Reset to default RVCE Sophos IP">Reset Default</button>
+            <label for="portalIp" style="margin-bottom: 0;">Portal Gateway Domain / IP</label>
+            <button type="button" id="resetIp" class="btn-text" title="Reset to official RVCE portal">Reset Default</button>
         </div>
-        <input type="text" id="portalIp" placeholder="172.16.0.4:8090" value="172.16.0.4:8090">
+        <input type="text" id="portalIp" placeholder="rvce-fw.rvce.edu.in:8090" value="rvce-fw.rvce.edu.in:8090">
         <div class="presets-row">
-            <button type="button" id="presetSophos" class="btn-preset active">Sophos (172.16.0.4:8090)</button>
-            <button type="button" id="presetFortinet" class="btn-preset">Fortinet (172.16.0.2:1003)</button>
+            <button type="button" id="presetRvceFw" class="btn-preset active">RVCE Portal (:8090)</button>
+            <button type="button" id="presetSophos" class="btn-preset">172.16.0.4:8090</button>
+            <button type="button" id="presetFortinet" class="btn-preset">172.16.0.2:1003</button>
         </div>
-        <div class="field-hint">Supports new Sophos portal & classic Fortinet gateway.</div>
+        <div class="field-hint">Supports official rvce-fw domain, Sophos IP, Fortinet, or any custom host.</div>
     </div>
 
     <div class="form-group">
@@ -259,14 +262,14 @@
     <!-- IP Change Warning Modal -->
     <div id="ipWarningModal" class="modal-overlay hidden">
         <div class="modal-box">
-            <div class="modal-title">⚠️ Change Portal Gateway IP?</div>
+            <div class="modal-title">⚠️ Change Portal Gateway?</div>
             <div class="modal-body" id="modalBodyText">
-                The standard RVCE campus portals are <strong>172.16.0.4:8090</strong> (Sophos) and <strong>172.16.0.2:1003</strong> (Fortinet).<br><br>
+                The standard RVCE campus portals are <strong>rvce-fw.rvce.edu.in:8090</strong>, <strong>172.16.0.4:8090</strong>, and <strong>172.16.0.2:1003</strong>.<br><br>
                 Only change this if your network gateway uses a different captive portal address.
             </div>
             <div class="modal-actions">
                 <button type="button" id="confirmIpChange" class="btn-modal-confirm">Proceed & Save</button>
-                <button type="button" id="cancelIpChange" class="btn-modal-cancel">Keep Default</button>
+                <button type="button" id="cancelIpChange" class="btn-modal-cancel">Keep Previous</button>
             </div>
         </div>
     </div>

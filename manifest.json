@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RVCE WiFi Auto-Login",
-  "version": "2.3.2",
+  "version": "2.4.0",
   "description": "Autonomous State-Machine Auto-Login and Session Refresh Engine for RVCE WiFi (Sophos & Fortinet)",
   "permissions": ["storage", "scripting"],
   "optional_host_permissions": ["*://*/*"],
@@ -26,24 +26,18 @@
   "content_scripts": [
     {
       "matches": [
-        "https://172.16.0.4:8090/*",
-        "http://172.16.0.4:8090/*",
-        "https://172.16.0.4/*",
-        "http://172.16.0.4/*",
-        "https://172.16.0.2:1003/*",
-        "http://172.16.0.2:1003/*"
+        "*://rvce-fw.rvce.edu.in/*",
+        "*://172.16.0.4/*",
+        "*://172.16.0.2/*"
       ],
       "run_at": "document_end",
       "js": ["content-script.js"]
     },
     {
       "matches": [
-        "https://172.16.0.4:8090/*",
-        "http://172.16.0.4:8090/*",
-        "https://172.16.0.4/*",
-        "http://172.16.0.4/*",
-        "https://172.16.0.2:1003/*",
-        "http://172.16.0.2:1003/*"
+        "*://rvce-fw.rvce.edu.in/*",
+        "*://172.16.0.4/*",
+        "*://172.16.0.2/*"
       ],
       "run_at": "document_start",
       "world": "MAIN",
@@ -54,12 +48,7 @@
     {
       "resources": ["page-bridge.js"],
       "matches": [
-        "https://172.16.0.4:8090/*",
-        "http://172.16.0.4:8090/*",
-        "https://172.16.0.4/*",
-        "http://172.16.0.4/*",
-        "https://172.16.0.2:1003/*",
-        "http://172.16.0.2:1003/*"
+        "*://*/*"
       ]
     }
   ]

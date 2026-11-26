@@ -1,10 +1,21 @@
-// RVCE WiFi Auto-Login Page Bridge (Main World Context)
+// RVCE WiFi Auto-Login Page Bridge (Main World Context) (v2.4.0)
 // Created by Mr. Shashanka Jois, CSE student at RVCE(batch 2027). email: shasedujois@gmail.com LinkedIn: https://www.linkedin.com/in/shashanka-jois-chessmate/
 
 (function () {
   "use strict";
 
-  console.log("[RVCE Page Bridge] Initialized in page main world context.");
+  // Idempotency guard: prevent duplicate listeners if loaded via both manifest MAIN world and DOM bridge
+  if (window.__rvcePageBridgeInitialized) {
+    return;
+  }
+  window.__rvcePageBridgeInitialized = true;
+  try {
+    if (document.documentElement) {
+      document.documentElement.dataset.rvceBridgeReady = "1";
+    }
+  } catch (e) {}
+
+  console.log("[RVCE Page Bridge v2.4.0] Initialized in page main world context.");
 
   // Cleanly neutralize Sophos onbeforeunload logout beacon in main world
   try {
@@ -51,6 +62,7 @@
       if (typeof sendLiveRequest === "function") {
         console.log("[RVCE Page Bridge] Invoking native Sophos sendLiveRequest()...");
         sendLiveRequest();
+        window.dispatchEvent(new CustomEvent("RVCE_LIVE_REFRESH_OK"));
         return;
       }
     } catch (e) {}

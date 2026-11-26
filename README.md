@@ -1,6 +1,6 @@
-# RVCE WiFi Auto-Login Engine (v2.3.2)
+# RVCE WiFi Auto-Login Engine (v2.4.0)
 
-An open-source Chrome Extension designed for RV College of Engineering (RVCE) students and faculty. It automates authentication on both the new campus **Sophos Cyberoam Captive Portal** (`https://172.16.0.4:8090/httpclient.html`) and the classic **Fortinet Gateway** (`https://172.16.0.2:1003`), runs an autonomous background keepalive refresh loop, and reconnects seamlessly when sessions expire.
+An open-source Chrome Extension designed for RV College of Engineering (RVCE) students and faculty. It automates authentication on the official campus **Sophos Captive Portal** (`https://rvce-fw.rvce.edu.in:8090/httpclient.html`), legacy **Sophos IP** (`172.16.0.4:8090`), and classic **Fortinet Gateway** (`172.16.0.2:1003`), runs an autonomous background keepalive refresh loop, and reconnects seamlessly when sessions expire.
 
 ---
 
@@ -39,14 +39,14 @@ The extension operates on an autonomous 4-state finite state machine (FSM):
 
 ## ✨ Features
 
-- **Dual-Gateway Universal Support**:
-  - **Sophos Cyberoam / Sophos Firewall** (`172.16.0.4:8090` / `httpclient.html`): Handles dynamic DOM buttons (`#loginbutton`), AJAX login requests, and active session monitoring.
+- **Multi-Gateway Universal Support**:
+  - **Official RVCE Sophos Portal** (`rvce-fw.rvce.edu.in:8090` / `httpclient.html`) & **Sophos IP** (`172.16.0.4:8090`): Handles dynamic DOM buttons (`#loginbutton`), AJAX login requests, and active session monitoring.
   - **Fortinet FortiGate** (`172.16.0.2:1003` / `/keepalive`): Classic campus captive portal with automatic lease renewal.
 - **Universal Sign-In Button Detection**:
   - Multi-tier detection engine supporting `div.button`, `a[href*="submitRequest"]`, `<button>`, `<input type="submit">`, and form submit fallbacks.
   - Safety filter strictly prevents accidental clicks on "Sign out" / "Logout" buttons.
-- **Customizable Portal Gateway IP with Presets**:
-  - One-click preset switching between **Sophos (`172.16.0.4:8090`)** and **Fortinet (`172.16.0.2:1003`)**, with support for custom campus AP gateways.
+- **Customizable Portal Gateway Domain / IP with Presets**:
+  - One-click preset switching between **`rvce-fw.rvce.edu.in:8090`**, **`172.16.0.4:8090`**, and **`172.16.0.2:1003`**, plus port-safe dynamic registration for any custom host or pasted URL.
 - **Configurable Keepalive Refresh**:
   - Default refresh interval is set to **5 minutes** (adjustable between 1 and 30 minutes in the popup).
   - Sophos: Pings server `/live?mode=192` beacon without disruptive full-page reloads and neutralizes destructive `onbeforeunload` logout beacons.
@@ -71,8 +71,9 @@ RVAutoWifiLogin/
 ├── popup/
 │   ├── popup.html                # Settings modal interface
 │   └── popup.js                  # Credential & interval configuration logic
-├── background.js                 # Service worker initializing default settings
+├── background.js                 # Service worker & dynamic script registration
 ├── content-script.js             # State machine controller & UI injection
+├── page-bridge.js                # Main-world DOM bridge for native portal triggers
 ├── manifest.json                 # Manifest V3 extension configuration
 └── README.md                     # Project documentation
 ```
@@ -83,7 +84,8 @@ RVAutoWifiLogin/
 
 | Version | Date | Key Highlights |
 | :--- | :--- | :--- |
-| **v2.3.2** | Current | • **100% CSP-Compliant Page Bridge Architecture**: Created `page-bridge.js` running in Manifest V3 `"world": "MAIN"` with custom DOM events (`RVCE_TRIGGER_LOGIN` & `RVCE_TRIGGER_REFRESH`). Completely eliminated Chrome CSP violations by preventing programmatic clicks on `javascript:` URLs.<br>• **Native Sophos AJAX Support**: Directly triggers Sophos's `submitRequest()` and `sendLiveRequest()` without inline script injections or eval.<br>• **Live Reactive Observer**: Instantaneous UI transition to State 2 on single-page login completion.<br>• **Multi-Gateway Fallbacks**: Smooth submission across Sophos, Fortinet, and custom portals. |
+| **v2.4.0** | Current | • **Official RVCE Domain Support**: Added native built-in support for `rvce-fw.rvce.edu.in:8090` alongside `172.16.0.4:8090` and `172.16.0.2:1003`.<br>• **Fixed Port Match Pattern Bug**: Stripped `:port` when calling Chrome `permissions.request` and `scripting.registerContentScripts` so custom host+port endpoints (like `:8090`) register properly without silent Chrome match-pattern rejection.<br>• **Full URL Input Parsing & Wider Resource Access**: Automatically extracts hostname from pasted full URLs and allows `page-bridge.js` across custom origins.<br>• **Sophos Auth Error & Bridge Fixes**: Prevented empty `validateLogin()` red status false positives, handled AJAX auth rejections immediately on login page, and made `page-bridge.js` idempotent without `eval()`. |
+| **v2.3.2** | Prev | • **100% CSP-Compliant Page Bridge Architecture**: Created `page-bridge.js` running in Manifest V3 `"world": "MAIN"` with custom DOM events (`RVCE_TRIGGER_LOGIN` & `RVCE_TRIGGER_REFRESH`). Completely eliminated Chrome CSP violations by preventing programmatic clicks on `javascript:` URLs.<br>• **Native Sophos AJAX Support**: Directly triggers Sophos's `submitRequest()` and `sendLiveRequest()` without inline script injections or eval.<br>• **Live Reactive Observer**: Instantaneous UI transition to State 2 on single-page login completion.<br>• **Multi-Gateway Fallbacks**: Smooth submission across Sophos, Fortinet, and custom portals. |
 | **v2.3.1** | Prev | • Fixed stuck "Connecting..." states and added anti-hang watchdog retry banner. |
 | **v2.3.0** | Prev | • **Sophos Captive Portal Support**: Complete integration for RVCE's new gateway `https://172.16.0.4:8090/httpclient.html`.<br>• **Universal Sign-In Button Recognition**: Multi-tier algorithm recognising `<div id="loginbutton">`, `a[href*="submitRequest"]`, `<button>`, `<input type="submit">`, and form fallbacks while strictly ignoring "Sign out" buttons.<br>• **Sophos Keepalive & Session Watchdog**: Native `/live` beacon pinging, `onbeforeunload` logout neutralization, and autonomous reconnect when sessions drop.<br>• **Dual Gateway Presets**: Instant 1-click preset switching in popup between Sophos (`172.16.0.4:8090`) and Fortinet (`172.16.0.2:1003`). |
 | **v2.2.0** | Prev | • Added customizable Portal Gateway IP/Host setting with instant "Reset Default" shortcut.<br>• Added interactive safety confirmation popup modal warning users before changing away from campus standards.<br>• Implemented dynamic runtime content script injection via Manifest V3 `chrome.scripting` API.<br>• Clean modern modal styling with responsive popup UI controls. |

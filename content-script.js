@@ -1,8 +1,8 @@
 /**
- * RVCE WiFi Auto-Login State Machine Engine (v2.3.2)
+ * RVCE WiFi Auto-Login State Machine Engine (v2.4.0)
  * 
  * Multi-Gateway Reactive Engine:
- * - Sophos Cyberoam / Sophos Firewall Portal (172.16.0.4:8090, httpclient.html)
+ * - Official RVCE Sophos Portal (rvce-fw.rvce.edu.in:8090 / 172.16.0.4:8090, httpclient.html)
  * - Fortinet FortiGate Captive Portal (172.16.0.2:1003, /keepalive, /fgtauth)
  * - Generic Captive Portals
  * 
@@ -18,11 +18,16 @@
 (function () {
   "use strict";
 
-  console.log("[RVCE Auto-Login Engine v2.3.2] Initializing on:", window.location.href);
+  console.log("[RVCE Auto-Login Engine v2.4.0] Initializing on:", window.location.href);
 
-  // Ensure Page Bridge is injected into the DOM (Main World context)
+  // Ensure Page Bridge is injected into the DOM (Main World context) if not already loaded via manifest MAIN world
   function ensureBridgeLoaded() {
-    if (document.getElementById("rvce-page-bridge")) return;
+    if (
+      document.getElementById("rvce-page-bridge") ||
+      (document.documentElement && document.documentElement.dataset.rvceBridgeReady === "1")
+    ) {
+      return;
+    }
     try {
       const script = document.createElement("script");
       script.id = "rvce-page-bridge";
@@ -187,17 +192,23 @@
   function triggerUniversalSubmit(loginButton) {
     console.log("[RVCE Auto-Login] Dispatching universal submit...");
 
+    const bridgeReady = Boolean(
+      document.documentElement && document.documentElement.dataset.rvceBridgeReady === "1"
+    );
+
     // 1. Dispatch DOM event to Main World bridge
     window.dispatchEvent(new CustomEvent("RVCE_TRIGGER_LOGIN"));
 
-    // 2. Background service worker execution in Main World (Manifest V3)
-    try {
-      if (chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({ action: "executeInMainWorld" }, (res) => {
-          console.log("[RVCE Auto-Login] Background main world execution ACK:", res);
-        });
-      }
-    } catch (e) {}
+    // 2. Only fall back to background service worker execution if Main World bridge isn't confirmed ready
+    if (!bridgeReady) {
+      try {
+        if (chrome.runtime && chrome.runtime.sendMessage) {
+          chrome.runtime.sendMessage({ action: "executeInMainWorld" }, (res) => {
+            console.log("[RVCE Auto-Login] Background main world execution ACK:", res);
+          });
+        }
+      } catch (e) {}
+    }
 
     // 3. For standard buttons / inputs (NOT javascript: links), dispatch standard clicks
     if (loginButton) {
@@ -216,7 +227,7 @@
       }
     }
 
-    // 4. Form submit fallback
+    // 4. Form submit fallback (for classic form-based portals like Fortinet)
     const userField = findUsernameField();
     const form = (loginButton ? loginButton.closest("form") : null) || (userField ? userField.closest("form") : null);
     if (form) {
@@ -320,14 +331,16 @@
   function hasAuthError() {
     const text = document.body ? document.body.innerText.toLowerCase() : "";
     const statusEl = document.getElementById("statusmessage");
-    const statusText = statusEl ? (statusEl.innerText || "").toLowerCase() : "";
-    const statusIsRed = statusEl && statusEl.className.includes("red");
+    const statusText = statusEl ? (statusEl.innerText || "").trim().toLowerCase() : "";
+    // Note: Sophos validateLogin() sets statusmessage className="red" with empty string "" even on valid input
+    const statusIsRedWithError = Boolean(statusEl && statusEl.className.includes("red") && statusText.length > 0);
 
     return (
-      statusIsRed ||
+      statusIsRedWithError ||
       statusText.includes("fail") ||
       statusText.includes("invalid") ||
       statusText.includes("limit reached") ||
+      statusText.includes("incorrect") ||
       text.includes("invalid username or password") ||
       text.includes("authentication failed") ||
       text.includes("login failed") ||
@@ -529,7 +542,7 @@
     sessionStorage.setItem("rvce_session_armed", "true");
     chrome.storage.local.set({ sessionArmed: true, lastKeepalive: Date.now() });
 
-    const isSophos = window.location.href.includes("httpclient.html") || !!document.getElementById("donotclosepage");
+    const isSophos = window.location.href.includes("httpclient.html") || !!document.getElementById("loginbutton");
     const gatewayLabel = isSophos ? "Sophos" : "Fortinet";
 
     chrome.storage.local.get(["refreshInterval", "username"], (result) => {
@@ -538,23 +551,24 @@
 
       const performRefresh = () => {
         console.log("[RVCE Auto-Login] Performing keepalive refresh...");
-        // 1. Dispatch event to Page Bridge
-        window.dispatchEvent(new CustomEvent("RVCE_TRIGGER_REFRESH"));
+        remainingSeconds = intervalMinutes * 60;
+        injectKeepaliveBadge(remainingSeconds, performRefresh, gatewayLabel);
 
-        // 2. Also execute backup ping if on Sophos
-        if (isSophos) {
+        const bridgeReady = Boolean(
+          document.documentElement && document.documentElement.dataset.rvceBridgeReady === "1"
+        );
+
+        if (isSophos && !bridgeReady) {
           const username = result.username || document.getElementById("username")?.value || "";
           const pingUrl = `/live?mode=192&username=${encodeURIComponent(username.toLowerCase())}&a=${Date.now()}`;
           fetch(pingUrl, { method: "GET" })
             .then((res) => res.text())
             .then((respText) => {
-              console.log("[RVCE Auto-Login] Sophos keepalive response:", respText.substring(0, 100));
-              remainingSeconds = intervalMinutes * 60;
-              injectKeepaliveBadge(remainingSeconds, performRefresh, gatewayLabel);
+              console.log("[RVCE Auto-Login] Sophos keepalive fallback response:", respText.substring(0, 100));
             })
-            .catch(() => {
-              remainingSeconds = intervalMinutes * 60;
-            });
+            .catch(() => {});
+        } else {
+          window.dispatchEvent(new CustomEvent("RVCE_TRIGGER_REFRESH"));
         }
       };
 
@@ -666,6 +680,19 @@
       if (currentState !== "LOGIN") {
         currentState = "LOGIN";
         handleLoginPage();
+      } else if (hasAuthError()) {
+        // Handle AJAX auth failure arriving while already on LOGIN_PAGE (e.g. Sophos States.REJECTED)
+        const banner = document.getElementById("rvce-auto-banner");
+        if (!banner || !banner.textContent.includes("Authentication Failed")) {
+          if (activeConnectingTimeout) {
+            clearTimeout(activeConnectingTimeout);
+            activeConnectingTimeout = null;
+          }
+          console.log("[RVCE State Machine] AJAX Auth failure detected. Disarming auto-login.");
+          sessionStorage.removeItem("rvce_session_armed");
+          chrome.storage.local.set({ sessionArmed: false });
+          injectTopBanner("❌ Authentication Failed: Check credentials or session limit.", "#dc2626", "default");
+        }
       }
     }
   }
